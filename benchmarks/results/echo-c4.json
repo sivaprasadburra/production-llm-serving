@@ -1,0 +1,45 @@
+{
+  "label": "echo backend, service overhead, c=4",
+  "timestamp_utc": "2026-11-16T19:09:48.799067+00:00",
+  "config": {
+    "url": "http://127.0.0.1:8000",
+    "model": "echo-1",
+    "requests": 2000,
+    "concurrency": 4,
+    "warmup": 20,
+    "prompt_file": null,
+    "max_tokens": 64,
+    "temperature": 0.0,
+    "timeout": 120,
+    "label": "echo backend, service overhead, c=4",
+    "output": "benchmarks/results/echo-c4.json",
+    "prompt_chars": 16
+  },
+  "environment": {
+    "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "cpu_model": "Neoverse-V2",
+    "cpu_count": 4,
+    "ram_total_gb": 247.2,
+    "python": "3.11.2"
+  },
+  "wall_time_s": 1.6629477759997826,
+  "requests": 2000,
+  "ok": 2000,
+  "status_counts": {
+    "200": 2000
+  },
+  "requests_per_s": 1202.6835892651998,
+  "latency_s": {
+    "mean": 0.0033117459119530396,
+    "min": 0.0021204379736445844,
+    "p50": 0.0032532790064578876,
+    "p95": 0.003594511871051509,
+    "p99": 0.004011357939743903,
+    "max": 0.009322068013716489
+  },
+  "prompt_tokens_total": 8000,
+  "completion_tokens_total": 128000,
+  "completion_tokens_per_s": 76971.74971297279,
+  "completion_tokens_per_s_per_request_mean": 19435.53963086659
+}

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -9,7 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.datastructures import Headers, MutableHeaders
 
-from .backends import Backend, get_backend
+from .backends import Backend, BackendError, get_backend
 from .config import Settings
 from .schemas import Choice, CompletionRequest, CompletionResponse, ModelInfo, ModelsResponse, Usage
 
@@ -102,9 +103,15 @@ async def _generate(request: Request, coro, timeout: float):
 
 def create_app(settings: Settings | None = None, backend: Backend | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings.from_env()
-    backend = backend if backend is not None else get_backend(settings.backend)
+    backend = backend if backend is not None else get_backend(settings)
     in_flight = 0  # generations running in this app instance
-    app = FastAPI()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        await backend.aclose()
+
+    app = FastAPI(lifespan=lifespan)
 
     app.add_middleware(RequestMiddleware, max_request_bytes=settings.max_request_bytes)
 
@@ -135,7 +142,7 @@ def create_app(settings: Settings | None = None, backend: Backend | None = None)
 
     @app.get("/readyz")
     async def ready():
-        if backend.is_ready():
+        if await backend.is_ready():
             return {"status": "ready"}
         return JSONResponse({"status": "not_ready"}, status_code=503)
 
@@ -165,6 +172,12 @@ def create_app(settings: Settings | None = None, backend: Backend | None = None)
             )
         except HTTPException:
             raise
+        except BackendError as exc:
+            logger.warning(
+                "Backend error status=%s cause=%r request_id=%s",
+                exc.status, exc.__cause__, request.state.request_id,
+            )
+            raise HTTPException(exc.status, exc.message) from None
         except Exception:
             logger.exception(
                 "Backend generation failed request_id=%s", request.state.request_id
