@@ -29,13 +29,15 @@ def percentile(sorted_values, q):
 
 
 async def run_benchmark(client: httpx.AsyncClient, *, model, requests, concurrency,
-                        warmup, prompt, max_tokens, temperature) -> list[dict]:
+                        warmup, prompt, max_tokens, temperature,
+                        unique_prompts: bool = False, first_number: int = 0) -> list[dict]:
     payload = dict(model=model, prompt=prompt, max_tokens=max_tokens, temperature=temperature)
 
-    async def send():
+    async def send(number):
+        request_payload = {**payload, "prompt": f"[request {number}] {prompt}"} if unique_prompts else payload
         started = time.perf_counter()
         try:
-            response = await client.post("v1/completions", json=payload)
+            response = await client.post("v1/completions", json=request_payload)
         except httpx.RequestError as exc:
             return {"latency_s": time.perf_counter() - started,
                     "status": f"error:{type(exc).__name__}"}
@@ -46,8 +48,8 @@ async def run_benchmark(client: httpx.AsyncClient, *, model, requests, concurren
                           completion_tokens=usage["completion_tokens"])
         return record
 
-    for _ in range(warmup):
-        await send()
+    for number in range(warmup):
+        await send(first_number + number)
     records = [None] * requests
     next_request = 0
 
@@ -56,7 +58,7 @@ async def run_benchmark(client: httpx.AsyncClient, *, model, requests, concurren
         while next_request < requests:
             number = next_request
             next_request += 1  # No await: taking a number is atomic within the event loop.
-            records[number] = await send()
+            records[number] = await send(first_number + warmup + number)
 
     await asyncio.gather(*(worker() for _ in range(min(concurrency, requests))))
     return records
@@ -110,6 +112,16 @@ def _cpu_model(system):
                 name = _field(lscpu, "Model name") or _field(cpuinfo, "CPU part")
             return name or "unknown"
         if system == "Windows":
+            try:
+                import winreg
+
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                    r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+                    name = winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
+                if name:
+                    return name
+            except Exception:
+                pass
             return os.environ.get("PROCESSOR_IDENTIFIER") or "unknown"
         if system == "Darwin":
             return subprocess.check_output(
@@ -120,8 +132,53 @@ def _cpu_model(system):
         return "unknown"
 
 
+def _cpu_physical_cores(system):
+    try:
+        if system == "Linux":
+            try:
+                cpuinfo = Path("/proc/cpuinfo").read_text()
+            except OSError:
+                cpuinfo = ""
+            pairs = set()
+            for processor in cpuinfo.split("\n\n"):
+                physical = _field(processor, "physical id")
+                core = _field(processor, "core id")
+                if physical is not None and core is not None:
+                    pairs.add((physical, core))
+            if pairs:
+                return len(pairs)
+            lscpu = subprocess.check_output(
+                ["lscpu"], text=True, timeout=2, env={**os.environ, "LC_ALL": "C"}
+            )
+            sockets = _field(lscpu, "Socket(s)")
+            if sockets and sockets != "-":
+                count = int(_field(lscpu, "Core(s) per socket")) * int(sockets)
+            else:
+                count = int(_field(lscpu, "Core(s) per cluster")) * int(_field(lscpu, "Cluster(s)"))
+        elif system == "Windows":
+            count = int(subprocess.check_output(
+                ["powershell", "-NoProfile", "-Command",
+                 "(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum"],
+                text=True, timeout=15,
+            ).strip())
+        elif system == "Darwin":
+            count = int(subprocess.check_output(
+                ["sysctl", "-n", "hw.physicalcpu"], text=True, timeout=2,
+            ).strip())
+        else:
+            return None
+        return count if count > 0 else None
+    except Exception:
+        return None
+
+
 def environment() -> dict:
     system = platform.system()
+    cpu_count = os.cpu_count()
+    physical_cores = _cpu_physical_cores(system)
+    # Containers may expose host topology but a restricted logical CPU count.
+    if physical_cores is not None and cpu_count is not None and physical_cores > cpu_count:
+        physical_cores = None
     ram = None
     try:
         if system == "Linux":
@@ -144,7 +201,8 @@ def environment() -> dict:
     except Exception:
         pass
     return {"platform": platform.platform(), "machine": platform.machine(),
-            "cpu_model": _cpu_model(system), "cpu_count": os.cpu_count(),
+            "cpu_model": _cpu_model(system), "cpu_count": cpu_count,
+            "cpu_physical_cores": physical_cores,
             "ram_total_gb": round(ram, 1) if ram is not None else None,
             "python": platform.python_version()}
 
@@ -159,6 +217,8 @@ def main(argv=None) -> int:
     prompts = parser.add_mutually_exclusive_group()
     prompts.add_argument("--prompt", default="Once upon a time")
     prompts.add_argument("--prompt-file")
+    parser.add_argument("--unique-prompts", action="store_true",
+                        help="prepend a unique request number to avoid prompt-prefix caching")
     parser.add_argument("--max-tokens", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--timeout", type=float, default=120)
@@ -185,10 +245,12 @@ def main(argv=None) -> int:
                                max_keepalive_connections=args.concurrency),
         ) as client:
             common = dict(model=args.model, concurrency=args.concurrency, prompt=prompt,
-                          max_tokens=args.max_tokens, temperature=args.temperature)
+                          max_tokens=args.max_tokens, temperature=args.temperature,
+                          unique_prompts=args.unique_prompts)
             await run_benchmark(client, requests=0, warmup=args.warmup, **common)
             started = time.perf_counter()
-            records = await run_benchmark(client, requests=args.requests, warmup=0, **common)
+            records = await run_benchmark(client, requests=args.requests, warmup=0,
+                                          first_number=args.warmup, **common)
             return summarize(records, time.perf_counter() - started)
 
     result = {"label": args.label, "timestamp_utc": datetime.now(timezone.utc).isoformat(),

@@ -1,6 +1,9 @@
 import asyncio
 import importlib.util
 import json
+import os
+import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import httpx
@@ -152,8 +155,15 @@ def test_transport_errors_are_not_retried():
 
 def test_environment():
     result = bench.environment()
-    assert set(result) == {"platform", "machine", "cpu_model", "cpu_count", "ram_total_gb", "python"}
+    assert set(result) == {"platform", "machine", "cpu_model", "cpu_count", "ram_total_gb", "python",
+                           "cpu_physical_cores"}
     assert result["cpu_model"]
+
+
+def test_environment_inconsistent_core_counts(monkeypatch):
+    monkeypatch.setattr(bench.os, "cpu_count", lambda: 4)
+    monkeypatch.setattr(bench, "_cpu_physical_cores", lambda system: 64)
+    assert bench.environment()["cpu_physical_cores"] is None
 
 
 def test_cpu_fallback(monkeypatch):
@@ -163,6 +173,7 @@ def test_cpu_fallback(monkeypatch):
     monkeypatch.setattr(bench.subprocess, "check_output", fail)
     assert bench._cpu_model("Linux") == "unknown"
     assert bench._cpu_model("Darwin") == "unknown"
+    monkeypatch.setitem(sys.modules, "winreg", SimpleNamespace(OpenKey=fail, HKEY_LOCAL_MACHINE=0))
     monkeypatch.setenv("PROCESSOR_IDENTIFIER", "test CPU")
     assert bench._cpu_model("Windows") == "test CPU"
 
@@ -197,3 +208,134 @@ def test_main_config_and_timing(monkeypatch, tmp_path, capsys):
     assert "private prompt" not in json.dumps(captured)
     assert "prompt" not in captured["config"]
     assert "2/2 succeeded" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("unique_prompts", [False, True])
+@pytest.mark.parametrize("through_main", [False, True])
+def test_unique_prompts(monkeypatch, unique_prompts, through_main):
+    received = []
+
+    class RecordingBackend(EchoBackend):
+        async def generate(self, prompt, *args):
+            received.append(prompt)
+            return await super().generate(prompt, *args)
+
+    app = create_app(Settings(), RecordingBackend())
+    client_class = httpx.AsyncClient
+
+    def client_factory(**kwargs):
+        return client_class(transport=httpx.ASGITransport(app), **kwargs)
+
+    if through_main:
+        captured = {}
+        monkeypatch.setattr(bench.httpx, "AsyncClient", client_factory)
+        monkeypatch.setattr(bench, "environment", lambda: {})
+        monkeypatch.setattr(bench.Path, "write_text",
+                            lambda self, text, **k: captured.update(json.loads(text)))
+        args = ["--model", "echo-1", "--requests", "6", "--warmup", "2",
+                "--concurrency", "2", "--prompt", OPTIONS["prompt"], "--output", "unused.json"]
+        assert bench.main(args + (["--unique-prompts"] if unique_prompts else [])) == 0
+        assert captured["config"]["unique_prompts"] is unique_prompts
+    else:
+        async def scenario():
+            async with client_factory(base_url="http://test") as client:
+                records = await bench.run_benchmark(client, **OPTIONS, unique_prompts=unique_prompts)
+            assert len(records) == 6
+            assert all(r["status"] == 200 for r in records)
+        asyncio.run(scenario())
+    assert len(received) == 8
+    assert all(prompt.endswith(OPTIONS["prompt"]) for prompt in received)
+    if unique_prompts:
+        assert set(received) == {f"[request {n}] {OPTIONS['prompt']}" for n in range(8)}
+    else:
+        assert received == [OPTIONS["prompt"]] * 8
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows hardware")
+def test_windows_environment():
+    result = bench.environment()
+    assert result["cpu_model"] != "unknown"
+    assert isinstance(result["cpu_physical_cores"], int)
+    assert 0 < result["cpu_physical_cores"] <= os.cpu_count()
+    assert result["ram_total_gb"] > 0
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux hardware")
+def test_linux_physical_cores():
+    cores = bench.environment()["cpu_physical_cores"]
+    assert cores is None or (isinstance(cores, int) and 0 < cores <= os.cpu_count())
+
+
+def test_windows_cpu_registry(monkeypatch):
+    class Key:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def open_key(root, path):
+        assert root == 0
+        assert path == r"HARDWARE\DESCRIPTION\System\CentralProcessor\0"
+        return Key()
+
+    def query_value(key, name):
+        assert name == "ProcessorNameString"
+        return "  CPU name  ", 1
+
+    monkeypatch.setitem(sys.modules, "winreg", SimpleNamespace(
+        HKEY_LOCAL_MACHINE=0, OpenKey=open_key, QueryValueEx=query_value))
+    monkeypatch.setenv("PROCESSOR_IDENTIFIER", "family string")
+    assert bench._cpu_model("Windows") == "CPU name"
+
+
+def test_linux_physical_core_pairs(monkeypatch):
+    cpuinfo = "\n\n".join(
+        f"processor: {n}\nphysical id: {socket}\ncore id: {core}"
+        for n, (socket, core) in enumerate([(0, 0), (0, 0), (0, 1), (1, 0)])
+    )
+    monkeypatch.setattr(bench.Path, "read_text", lambda self: cpuinfo)
+    assert bench._cpu_physical_cores("Linux") == 3
+
+
+@pytest.mark.parametrize("output,expected", [
+    ("Core(s) per socket: 4\nSocket(s): 2", 8),
+    ("Socket(s): -\nCore(s) per cluster: 4\nCluster(s): 2", 8),
+    ("", None), ("Core(s) per socket: 0\nSocket(s): 2", None),
+])
+def test_linux_physical_core_fallback(monkeypatch, output, expected):
+    monkeypatch.setattr(bench.Path, "read_text", lambda self: "CPU part: 0xd03")
+
+    def lscpu(command, **kwargs):
+        assert command == ["lscpu"]
+        assert kwargs["env"]["LC_ALL"] == "C"
+        return output
+
+    monkeypatch.setattr(bench.subprocess, "check_output", lscpu)
+    assert bench._cpu_physical_cores("Linux") == expected
+
+
+@pytest.mark.parametrize("system", ["Windows", "Darwin"])
+@pytest.mark.parametrize("output,expected", [(" 8\n", 8), ("", None), ("bad", None), ("0", None)])
+def test_physical_core_commands(monkeypatch, system, output, expected):
+    def command(args, **kwargs):
+        if system == "Windows":
+            assert args == ["powershell", "-NoProfile", "-Command",
+                            "(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum"]
+            assert kwargs["timeout"] == 15
+        else:
+            assert args == ["sysctl", "-n", "hw.physicalcpu"]
+        return output
+
+    monkeypatch.setattr(bench.subprocess, "check_output", command)
+    assert bench._cpu_physical_cores(system) == expected
+
+
+@pytest.mark.parametrize("system", ["Linux", "Windows", "Darwin", "other"])
+def test_physical_cores_failure(monkeypatch, system):
+    def fail(*args, **kwargs):
+        raise OSError("unavailable")
+
+    monkeypatch.setattr(bench.Path, "read_text", fail)
+    monkeypatch.setattr(bench.subprocess, "check_output", fail)
+    assert bench._cpu_physical_cores(system) is None

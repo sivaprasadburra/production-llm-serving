@@ -234,6 +234,9 @@ HTTP timeout. `--warmup` sequential requests run first (default 1, 0 disables th
 they are excluded from counts and measured wall time. Workers send the next request
 as soon as the previous one finishes. Failures are counted without retries.
 
+Use `--unique-prompts` to prepend a distinct request number to every prompt,
+including warmup, when measuring prompt processing without llama-server's prompt-prefix cache reuse.
+
 A short summary always prints; `--output` optionally saves JSON with configuration
 (prompt length only), environment, successful-request latency percentiles, aggregate
 token throughput and mean per-request token speed. RAM is reported in GiB rounded
