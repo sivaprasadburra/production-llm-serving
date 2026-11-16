@@ -26,6 +26,7 @@ class FakeLlamaServer:
 
     def __init__(self):
         self.health = (200, {"status": "ok"})
+        self.props = (200, {"total_slots": 1})
         self.completion = (200, COMPLETION)  # (status, json) | (status, raw bytes) | "hang"
         self.requests = []  # (path, headers, parsed json body)
         self.entered = asyncio.Event()
@@ -42,6 +43,8 @@ class FakeLlamaServer:
         self.requests.append((scope["path"], headers, json.loads(body) if body else None))
         if scope["path"] == "/health":
             return await self._respond(send, *self.health)
+        if scope["path"] == "/props":
+            return await self._respond(send, *self.props)
         if self.completion == "hang":
             self.entered.set()
             try:
@@ -112,6 +115,29 @@ def test_readiness_follows_upstream_health(health, status, body):
         assert client.get("/healthz").status_code == 200  # liveness is independent of upstream
 
 
+def test_slot_mismatch_is_warned_once_per_upstream_start(caplog):
+    fake = FakeLlamaServer()
+    with TestClient(make_app(fake, max_concurrency=4)) as client:
+        assert client.get("/readyz").status_code == 200
+        assert client.get("/readyz").status_code == 200
+        assert caplog.text.count("exceeds llama-server slots (--parallel 1)") == 1
+        fake.health = (503, {})  # llama-server restarts, possibly with new settings
+        assert client.get("/readyz").status_code == 503
+        fake.health = (200, {"status": "ok"})
+        assert client.get("/readyz").status_code == 200
+        assert caplog.text.count("exceeds llama-server slots") == 2
+
+
+@pytest.mark.parametrize("props", [(200, {"total_slots": 4}), (200, {"total_slots": 8}),
+                                   (404, b""), (200, b"nope"), (200, {"other": 1})])
+def test_no_slot_warning_when_matched_or_props_unavailable(caplog, props):
+    fake = FakeLlamaServer()
+    fake.props = props
+    with TestClient(make_app(fake, max_concurrency=4)) as client:
+        assert client.get("/readyz").status_code == 200
+    assert "exceeds llama-server slots" not in caplog.text
+
+
 def failing_transport(exc):
     def handler(request):
         raise exc
@@ -149,15 +175,15 @@ def test_transport_failures(exc, status):
     ((400, {"error": {"message": "m" * 5000}}), 400, "m" * 200),
     ((400, b"not json"), 400, "request rejected by model backend"),
     ((400, {"error": "flat string"}), 400, "request rejected by model backend"),
-    ((401, {"error": {"message": "Invalid API Key"}}), 502, "model backend returned an invalid response"),
-    ((500, {"error": {"message": "internal detail"}}), 502, "model backend returned an invalid response"),
-    ((200, b"<html>not json</html>"), 502, "model backend returned an invalid response"),
-    ((200, {"choices": []}), 502, "model backend returned an invalid response"),
-    ((200, {"choices": [{"text": "x"}]}), 502, "model backend returned an invalid response"),
-    ((200, {**COMPLETION, "choices": [{"text": None}]}), 502, "model backend returned an invalid response"),
+    ((401, {"error": {"message": "Invalid API Key"}}), 502, "model backend error"),
+    ((500, {"error": {"message": "internal detail"}}), 502, "model backend error"),
+    ((200, b"<html>not json</html>"), 502, "model backend error"),
+    ((200, {"choices": []}), 502, "model backend error"),
+    ((200, {"choices": [{"text": "x"}]}), 502, "model backend error"),
+    ((200, {**COMPLETION, "choices": [{"text": None}]}), 502, "model backend error"),
     ((200, {**COMPLETION, "usage": {"prompt_tokens": "5", "completion_tokens": 4}}), 502,
-     "model backend returned an invalid response"),
-    ((200, [1, 2, 3]), 502, "model backend returned an invalid response"),
+     "model backend error"),
+    ((200, [1, 2, 3]), 502, "model backend error"),
 ])
 def test_upstream_responses(completion, status, message):
     fake = FakeLlamaServer()

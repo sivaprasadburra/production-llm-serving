@@ -12,13 +12,15 @@ from . import BackendError, GenerationResult
 logger = logging.getLogger(__name__)
 
 UNAVAILABLE = "model backend unavailable"
-BAD_GATEWAY = "model backend returned an invalid response"
+BAD_GATEWAY = "model backend error"
 
 
 class LlamaServerBackend:
     def __init__(self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None):
         key = settings.llama_server_api_key
         self._probe_timeout = settings.llama_server_connect_timeout_s
+        self._max_concurrency = settings.max_concurrency
+        self._slots_checked = False
         self._client = httpx.AsyncClient(
             base_url=settings.llama_server_url,
             headers={"Authorization": f"Bearer {key}"} if key else {},
@@ -34,8 +36,32 @@ class LlamaServerBackend:
         try:
             response = await self._client.get("/health", timeout=self._probe_timeout)
         except httpx.HTTPError:
+            response = None
+        if response is None or response.status_code != 200:
+            self._slots_checked = False  # re-check after llama-server comes back
             return False
-        return response.status_code == 200
+        if not self._slots_checked:
+            await self._check_slots()
+        return True
+
+    async def _check_slots(self) -> None:
+        """Warn once if we admit more requests than llama-server has slots.
+
+        The excess would queue inside llama-server (invisible to clients, eating
+        their timeout budget) instead of failing fast with a 503 here.
+        """
+        try:
+            response = await self._client.get("/props", timeout=self._probe_timeout)
+            slots = response.json()["total_slots"]
+        except (httpx.HTTPError, ValueError, LookupError, TypeError):
+            return  # /props is optional; try again on the next readiness probe
+        self._slots_checked = True
+        if type(slots) is int and self._max_concurrency > slots:
+            logger.warning(
+                "LLM_MAX_CONCURRENCY=%s exceeds llama-server slots (--parallel %s): "
+                "excess requests will queue upstream instead of getting a 503",
+                self._max_concurrency, slots,
+            )
 
     async def aclose(self) -> None:
         await self._client.aclose()
