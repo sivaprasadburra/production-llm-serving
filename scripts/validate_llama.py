@@ -288,12 +288,26 @@ def timed(call):
 
 # ---------------------------------------------------------------- the run
 
+def default_threads(env):
+    """Threads for llama-server: physical cores, never more than the CPUs we may use.
+
+    llama-server's own default counts the host's cores. Inside a container or a
+    CPU-limited VM that oversubscribes badly (measured: 64 threads on a 4-CPU
+    quota ran about 780 times slower), so the count is always passed explicitly.
+    """
+    limits = [env.get("cpu_physical_cores"), env.get("cpu_count")]
+    try:  # Linux cgroup v2 CPU quota, e.g. "400000 100000" = 4 CPUs
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        limits.append(max(1, int(quota) // int(period)))
+    except (OSError, ValueError):
+        pass
+    return min([n for n in limits if n] or [1])
+
+
 def llama_command(server, model, args, alias):
-    command = [*server, "-m", str(model), "--host", "127.0.0.1", "--port", str(args.llama_port),
-               "--alias", alias, "-np", str(args.parallel), "-c", str(args.ctx * args.parallel)]
-    if args.threads:
-        command += ["-t", str(args.threads)]
-    return command
+    return [*server, "-m", str(model), "--host", "127.0.0.1", "--port", str(args.llama_port),
+            "--alias", alias, "-np", str(args.parallel), "-c", str(args.ctx * args.parallel),
+            "-t", str(args.threads)]
 
 
 def gateway_env(args, alias):
@@ -372,25 +386,41 @@ def run(args, server, model, model_info, out):
         text = through.json()["choices"][0]["text"] if ok else ""
         check("gateway generates text through llama-server", ok and text.strip(), f"{seconds} s")
         if ok:
+            usage = through.json()["usage"]
             result["sample"] = {"question": SAMPLE_QUESTION, "text": text, "seconds": seconds,
-                                "usage": through.json()["usage"],
+                                "tokens_per_s": round(usage["completion_tokens"] / seconds, 1) if seconds else None,
+                                "usage": usage,
                                 "finish_reason": through.json()["choices"][0]["finish_reason"]}
             say("  model said: " + text.strip().encode("ascii", "replace").decode()[:200])
         wrong, _ = timed(lambda: client.post(gateway_url + "/v1/completions", timeout=30,
                                              json={**body, "model": "no-such-model"}))
         check("unknown model is rejected with 404", getattr(wrong, "status_code", None) == 404)
 
-        # Client disconnect: abandon a long generation, then expect the slot to be free at once.
-        long_body = {**body, "prompt": template.format(question=QUESTION), "max_tokens": 512}
+        # Client disconnect: abandon a long generation after 1 s, then time how long the
+        # (single) slot takes to accept work again. Without cancellation it would stay
+        # busy, answering 503, until the abandoned generation finished on its own.
+        long_tokens = 512
+        long_body = {**body, "prompt": template.format(question=QUESTION), "max_tokens": long_tokens}
         long_body.pop("stop", None)
+        speed = result.get("sample", {}).get("tokens_per_s") or 0
+        expected = long_tokens / speed if speed else 0  # seconds the long request needs
         abandoned, _ = timed(lambda: client.post(gateway_url + "/v1/completions", json=long_body, timeout=1.0))
-        after, seconds = timed(lambda: client.post(gateway_url + "/v1/completions", json=body, timeout=args.timeout))
-        if isinstance(abandoned, httpx.Response):
-            check("client disconnect frees the slot", True,
-                  "inconclusive: the long generation finished in under 1 s")
+        started = time.perf_counter()
+        while True:
+            after, _ = timed(lambda: client.post(gateway_url + "/v1/completions", json=body, timeout=args.timeout))
+            freed = round(time.perf_counter() - started, 3)
+            if getattr(after, "status_code", None) != 503 or freed > 10:
+                break
+            time.sleep(0.05)
+        status = getattr(after, "status_code", type(after).__name__)
+        if isinstance(abandoned, httpx.Response) or expected < 5:
+            check("client disconnect frees the slot", status == 200,
+                  "inconclusive: this model finishes the long request too quickly to tell")
         else:
-            check("client disconnect frees the slot", getattr(after, "status_code", None) == 200,
-                  f"follow-up request answered {getattr(after, 'status_code', type(after).__name__)} in {seconds} s")
+            result["disconnect"] = {"slot_free_after_s": freed, "abandoned_request_needed_s": round(expected, 1)}
+            check("client disconnect frees the slot", status == 200 and freed < expected / 2,
+                  f"next request answered {status} after {freed} s; the abandoned request "
+                  f"would have run for about {expected:.0f} s")
 
         say("Benchmarks (benchmarks/bench.py)")
         prompt_file = out / "bench-prompt.txt"
@@ -460,7 +490,9 @@ def render(report):
         "## Machine", "", "| | |", "|---|---|",
         f"| OS | {env['platform']} |", f"| CPU | {env['cpu_model']} ({env['machine']}) |",
         f"| Cores | {env.get('cpu_physical_cores') or 'unknown'} physical, {env['cpu_count']} logical |",
-        f"| RAM | {env['ram_total_gb']} GiB |", f"| Python | {env['python']} |", "",
+        f"| RAM | {env['ram_total_gb']} GiB"
+        + (f" (this process is limited to {report['memory_limit_gb']} GiB)" if report.get("memory_limit_gb") else "") + " |",
+        f"| Python | {env['python']} |", "",
         "## Model", "", "| | |", "|---|---|",
         f"| Model | {model['name']} |", f"| File | `{model['file']}` ({model['size'] / 1e6:.1f} MB) |",
         f"| SHA-256 | `{model['sha256']}` |",
@@ -471,7 +503,7 @@ def render(report):
         f"| Build info | {(result.get('llama_props') or {}).get('build_info')} |",
         f"| Slots | {(result.get('llama_props') or {}).get('total_slots')} |",
         f"| Context per slot | {result.get('n_ctx_slot')} tokens |",
-        f"| Threads | {result.get('n_threads')} |",
+        f"| Threads | {result.get('n_threads')} (`-t {report['config']['threads']}`) |",
         f"| Command | `{show(report['llama_command_display'])}` |", "",
         "Gateway settings: " + ", ".join(f"`{k}={v}`" for k, v in (result.get("gateway_env") or {}).items()), "",
         "## Checks", "", "| Check | Result | Detail |", "|---|---|---|",
@@ -495,20 +527,29 @@ def render(report):
               f"{config['warmup']} warm-up, `max_tokens={config['max_tokens']}`, `temperature=0`, non-streaming.",
               "\"Same prompt\" lets llama-server reuse its prompt cache; \"different prompt\" forces it to "
               "process the whole prompt every time, which is closer to real traffic.", "",
-              "| Path | Prompts | OK | Requests/s | p50 (s) | p95 (s) | p99 (s) | Completion tokens/s | Prompt tokens |",
+              "| Path | Prompts | OK | Requests/s | p50 (s) | p95 (s) | p99 (s) | Tokens/s | Prompt tokens |",
               "|---|---|---|---|---|---|---|---|---|"]
+    p50 = {}
     for item in result["benchmarks"]:
         data = item["result"]
         if not data or not data["latency_s"]:
             lines.append(f"| {item['target']} | {'different' if item['unique_prompts'] else 'same'} | failed | | | | | | |")
             continue
         latency = data["latency_s"]
+        p50[item["name"]] = latency["p50"]
         lines.append(
             f"| {item['target']} | {'different' if item['unique_prompts'] else 'same'} | {data['ok']}/{data['requests']} "
             f"| {data['requests_per_s']:.3f} | {latency['p50']:.3f} | {latency['p95']:.3f} | {latency['p99']:.3f} "
             f"| {data['completion_tokens_per_s']:.1f} | {data['prompt_tokens_total'] // max(data['ok'], 1)} |")
+    lines += ["", "Tokens/s is completion tokens divided by wall time, so it includes prompt processing.", ""]
+    for kind in ("same", "unique"):
+        if f"direct-{kind}-prompt" in p50 and f"gateway-{kind}-prompt" in p50:
+            direct, through = p50[f"direct-{kind}-prompt"], p50[f"gateway-{kind}-prompt"]
+            lines.append(f"- Gateway overhead at p50, {'same' if kind == 'same' else 'different'} prompts: "
+                         f"{(through - direct) * 1000:+.1f} ms ({(through / direct - 1) * 100:+.1f}%).")
     lines += ["", f"With {config['requests']} requests, p99 is close to the slowest request; "
-              "use `--requests 100` or more for meaningful tails.", ""]
+              "use `--requests 100` or more for meaningful tails. Differences of a few percent between "
+              "single runs are within noise.", ""]
     if result.get("outage"):
         lines += ["## Outage behaviour", "",
                   f"With llama-server stopped, `/readyz` answered in {result['outage']['readyz_seconds']} s and a "
@@ -532,7 +573,8 @@ def main(argv=None):
     parser.add_argument("--llama-server", help="path to llama-server(.exe) (default: pinned download)")
     parser.add_argument("--download", action="store_true", help="allow downloading llama.cpp and the model")
     parser.add_argument("--cache", default=str(ROOT / ".cache"), help="where downloads are kept")
-    parser.add_argument("--threads", type=int, help="llama-server -t (default: llama-server decides)")
+    parser.add_argument("--threads", type=int,
+                        help="llama-server -t (default: physical cores, capped at usable CPUs)")
     parser.add_argument("--ctx", type=int, default=4096, help="context tokens per slot")
     parser.add_argument("--parallel", type=int, default=1, help="slots and gateway concurrency")
     parser.add_argument("--requests", type=int, default=20)
@@ -571,17 +613,25 @@ def main(argv=None):
         parser.error(f"llama-server not found: {server_path}")
     server = [sys.executable, str(server_path)] if server_path.suffix == ".py" else [str(server_path)]
 
-    say(f"Model: {info['name']}  |  llama-server: {server_path.name}  |  report: {out}")
+    env = environment()
+    if not args.threads:
+        args.threads = default_threads(env)
+    say(f"Model: {info['name']}  |  llama-server: {server_path.name}  |  threads: {args.threads}  |  report: {out}")
     result = run(args, server, model, info, out)
     passed = bool(result["checks"]) and all(c["ok"] for c in result["checks"])
 
     def display(command):  # file names only: no user names or local folders in the report
-        return [Path(part).name if os.sep in str(part) or "/" in str(part) else str(part) for part in command]
+        return [str(part) if "://" in str(part) or not (os.sep in str(part) or "/" in str(part))
+                else Path(str(part)).name for part in command]
 
+    try:  # Linux cgroup v2 memory limit (containers, CI sandboxes)
+        limit = round(int(Path("/sys/fs/cgroup/memory.max").read_text()) / 1024**3, 1)
+    except (OSError, ValueError):
+        limit = None
     report = {
-        "label": args.label, "ci": bool(os.environ.get("GITHUB_ACTIONS")),
+        "label": args.label, "memory_limit_gb": limit, "ci": bool(os.environ.get("GITHUB_ACTIONS")),
         "timestamp_utc": stamp.isoformat(timespec="seconds"), "passed": passed,
-        "environment": environment(),
+        "environment": env,
         "model": {k: v for k, v in info.items() if k not in ("template", "stop")},
         "config": {k: v for k, v in vars(args).items() if k not in ("model", "llama_server", "cache", "out")},
         "llama_command_display": display(result.pop("llama_command", [])),
