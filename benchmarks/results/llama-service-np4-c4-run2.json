@@ -1,0 +1,45 @@
+{
+  "label": "service -> llama-server, stories15M-q4_0, np=4 t=4, c=4, run 2",
+  "timestamp_utc": "2026-11-16T19:10:46.258148+00:00",
+  "config": {
+    "url": "http://127.0.0.1:8000",
+    "model": "stories15m",
+    "requests": 400,
+    "concurrency": 4,
+    "warmup": 5,
+    "prompt_file": null,
+    "max_tokens": 64,
+    "temperature": 0.0,
+    "timeout": 120,
+    "label": "service -> llama-server, stories15M-q4_0, np=4 t=4, c=4, run 2",
+    "output": "benchmarks/results/llama-service-np4-c4-run2.json",
+    "prompt_chars": 16
+  },
+  "environment": {
+    "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "cpu_model": "Neoverse-V2",
+    "cpu_count": 4,
+    "ram_total_gb": 247.2,
+    "python": "3.11.2"
+  },
+  "wall_time_s": 5.001668385026278,
+  "requests": 400,
+  "ok": 400,
+  "status_counts": {
+    "200": 400
+  },
+  "requests_per_s": 79.97331474383591,
+  "latency_s": {
+    "mean": 0.04992692949075717,
+    "min": 0.0417352530057542,
+    "p50": 0.04955421999329701,
+    "p95": 0.05144241306988988,
+    "p99": 0.06821438367420342,
+    "max": 0.06991851501516066
+  },
+  "prompt_tokens_total": 2000,
+  "completion_tokens_total": 25600,
+  "completion_tokens_per_s": 5118.2921436054985,
+  "completion_tokens_per_s_per_request_mean": 1285.225700683777
+}

@@ -84,34 +84,40 @@ def summarize(records, wall_time_s) -> dict:
     }
 
 
+def _field(text, key):
+    for line in text.splitlines():
+        name, sep, value = line.partition(":")
+        if sep and name.strip() == key and value.strip():
+            return value.strip()
+    return None
+
+
 def _cpu_model(system):
     try:
         if system == "Linux":
             try:
-                info = Path("/proc/cpuinfo").read_text()
+                cpuinfo = Path("/proc/cpuinfo").read_text()
             except OSError:
-                info = ""
-            for source in (info, None):
-                if source is None:
-                    source = subprocess.check_output(
+                cpuinfo = ""
+            name = _field(cpuinfo, "model name")  # x86
+            if not name:  # ARM: /proc/cpuinfo only has a numeric "CPU part"
+                try:
+                    lscpu = subprocess.check_output(
                         ["lscpu"], text=True, timeout=2, env={**os.environ, "LC_ALL": "C"}
                     )
-                for key in ("model name", "Model name", "CPU part"):
-                    for line in source.splitlines():
-                        name, sep, value = line.partition(":")
-                        if sep and name.strip() == key and value.strip():
-                            return value.strip()
-        elif system == "Windows":
+                except (OSError, subprocess.SubprocessError):
+                    lscpu = ""
+                name = _field(lscpu, "Model name") or _field(cpuinfo, "CPU part")
+            return name or "unknown"
+        if system == "Windows":
             return os.environ.get("PROCESSOR_IDENTIFIER") or "unknown"
-        elif system == "Darwin":
+        if system == "Darwin":
             return subprocess.check_output(
                 ["sysctl", "-n", "machdep.cpu.brand_string"], text=True, timeout=2
             ).strip() or "unknown"
-        else:
-            return platform.processor() or "unknown"
+        return platform.processor() or "unknown"
     except Exception:
-        pass
-    return "unknown"
+        return "unknown"
 
 
 def environment() -> dict:
@@ -191,6 +197,10 @@ def main(argv=None) -> int:
           f"{result['requests_per_s']:.2f} requests/s; "
           f"{result['completion_tokens_per_s']:.2f} completion tokens/s; "
           f"statuses: {result['status_counts']}")
+    if result["latency_s"]:
+        print("latency ms: " + ", ".join(
+            f"{name} {result['latency_s'][name] * 1000:.1f}" for name in ("p50", "p95", "p99", "max")
+        ))
     if args.output:
         Path(args.output).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return 0 if result["ok"] else 1
