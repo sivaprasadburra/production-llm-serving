@@ -31,7 +31,7 @@ Dev extra (`[dev]`): `pytest`, `httpx`. Nothing else.
 | `LLM_MAX_PROMPT_CHARS` | `8192` | longer prompt -> 413 |
 | `LLM_MAX_TOKENS_LIMIT` | `512` | upper bound for `max_tokens` |
 | `LLM_MAX_CONCURRENCY` | `4` | in-flight generations; extra requests get 503 immediately |
-| `LLM_REQUEST_TIMEOUT_S` | `30` | generation timeout -> 504 |
+| `LLM_REQUEST_TIMEOUT_S` | `30` | generation timeout in seconds (float) -> 504, backend task cancelled |
 
 Invalid values (non-int, <=0) must raise a clear error at startup.
 
@@ -79,7 +79,9 @@ else generate uuid4 hex) and echo it on every response.
 
 Concurrency: an `asyncio.Semaphore`-style limiter created per app instance
 (not module-global). If no slot is free, return 503 immediately (do not
-queue). Always release the slot, including on timeout/exception.
+queue). Always release the slot, including on timeout/exception, but only
+after the backend task has actually stopped. A client disconnect cancels the
+backend task and frees the slot (status 499 in logs).
 
 ## Tests (pytest, no network, must run in < 10s)
 

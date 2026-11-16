@@ -161,7 +161,7 @@ def test_failures_release_slot(failure, status, caplog):
                 raise RuntimeError("private backend detail")
             return await super().generate(*args)
 
-    with TestClient(create_app(Settings(max_concurrency=1, request_timeout_s=1), FailsOnce())) as client:
+    with TestClient(create_app(Settings(max_concurrency=1, request_timeout_s=0.05), FailsOnce())) as client:
         response = client.post("/v1/completions", json=payload())
         assert_error(response, status)
         assert "private backend detail" not in response.text
@@ -218,12 +218,29 @@ def test_config_defaults_and_valid_env(clean_env, monkeypatch):
         assert client.get("/v1/models").json()["data"][0]["id"] == "custom"
 
 
-@pytest.mark.parametrize("name", ["MAX_REQUEST_BYTES", "MAX_PROMPT_CHARS", "MAX_TOKENS_LIMIT", "MAX_CONCURRENCY", "REQUEST_TIMEOUT_S"])
+INT_SETTINGS = ["MAX_REQUEST_BYTES", "MAX_PROMPT_CHARS", "MAX_TOKENS_LIMIT", "MAX_CONCURRENCY"]
+
+
+@pytest.mark.parametrize("name", INT_SETTINGS)
 @pytest.mark.parametrize("value", ["abc", "1.5", "0", "-1", ""])
-def test_invalid_config(clean_env, monkeypatch, name, value):
+def test_invalid_int_config(clean_env, monkeypatch, name, value):
     monkeypatch.setenv(f"LLM_{name}", value)
     with pytest.raises(ValueError, match=f"LLM_{name} must be a positive integer"):
         create_app()
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-1", "", "nan", "inf"])
+def test_invalid_timeout_config(clean_env, monkeypatch, value):
+    monkeypatch.setenv("LLM_REQUEST_TIMEOUT_S", value)
+    with pytest.raises(ValueError, match="LLM_REQUEST_TIMEOUT_S must be a positive number"):
+        create_app()
+
+
+def test_fractional_timeout_config(clean_env, monkeypatch):
+    monkeypatch.setenv("LLM_REQUEST_TIMEOUT_S", "0.5")
+    assert Settings.from_env().request_timeout_s == 0.5
+    with pytest.raises(ValueError):
+        Settings(request_timeout_s=True)
 
 
 def test_unknown_backend(clean_env, monkeypatch):
@@ -231,3 +248,155 @@ def test_unknown_backend(clean_env, monkeypatch):
     monkeypatch.setenv("LLM_BACKEND", "unknown")
     with pytest.raises(ValueError, match="Unknown LLM_BACKEND"):
         create_app()
+
+
+# --- Hardening regressions: raw ASGI so disconnects and cancellation are deterministic ---
+
+async def asgi_post(app, body, disconnect=None, request_id=b"rid-1"):
+    """POST /v1/completions; after the body, `receive` blocks until `disconnect` is set."""
+    pending = [{"type": "http.request", "body": body, "more_body": False}]
+    sent = []
+
+    async def receive():
+        if pending:
+            return pending.pop(0)
+        await (disconnect or asyncio.Event()).wait()
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST",
+        "scheme": "http", "path": "/v1/completions", "raw_path": b"/v1/completions",
+        "query_string": b"", "root_path": "", "server": ("test", 80), "client": ("test", 1),
+        "headers": [(b"content-type", b"application/json"), (b"x-request-id", request_id)],
+    }
+    await app(scope, receive, send)
+    return sent
+
+
+class Hanging(EchoBackend):
+    """Blocks until cancelled; records how generation ended."""
+
+    def __init__(self):
+        self.entered = asyncio.Event()
+        self.cancelled = False
+
+    async def generate(self, *args):
+        self.entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+
+
+BODY = b'{"model":"echo-1","prompt":"one two"}'
+
+
+def test_client_disconnect_cancels_generation_and_frees_slot():
+    async def scenario():
+        backend = Hanging()
+        app = create_app(Settings(max_concurrency=1), backend)
+        disconnect = asyncio.Event()
+        request = asyncio.create_task(asgi_post(app, BODY, disconnect))
+        await asyncio.wait_for(backend.entered.wait(), 2)
+        assert (await asgi_post(app, BODY))[0]["status"] == 503  # slot is held
+        disconnect.set()
+        sent = await asyncio.wait_for(request, 2)
+        assert backend.cancelled
+        assert sent[0]["status"] == 499
+        # Slot is free again: the next request reaches the backend.
+        backend.entered.clear()
+        again = asyncio.create_task(asgi_post(app, BODY))
+        await asyncio.wait_for(backend.entered.wait(), 2)
+        again.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_server_cancellation_propagates_and_frees_slot():
+    async def scenario():
+        backend = Hanging()
+        app = create_app(Settings(max_concurrency=1), backend)
+        request = asyncio.create_task(asgi_post(app, BODY))
+        await asyncio.wait_for(backend.entered.wait(), 2)
+        request.cancel()
+        with pytest.raises(asyncio.CancelledError):  # not swallowed, not turned into a 500
+            await request
+        assert backend.cancelled
+        backend.entered.clear()
+        again = asyncio.create_task(asgi_post(app, BODY))
+        await asyncio.wait_for(backend.entered.wait(), 2)  # slot was released
+        again.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_timeout_cancels_backend():
+    async def scenario():
+        backend = Hanging()
+        app = create_app(Settings(max_concurrency=1, request_timeout_s=0.05), backend)
+        sent = await asyncio.wait_for(asgi_post(app, BODY), 2)
+        assert sent[0]["status"] == 504
+        assert backend.cancelled
+
+    asyncio.run(scenario())
+
+
+def test_slot_held_until_backend_actually_stops():
+    """A backend that is slow to honour cancellation must keep its slot until it is done."""
+    async def scenario():
+        entered, cancelling, finish = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+        class SlowToCancel(EchoBackend):
+            async def generate(self, *args):
+                entered.set()
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    cancelling.set()
+                    await finish.wait()  # still using the model while cleaning up
+                    raise
+
+        app = create_app(Settings(max_concurrency=1, request_timeout_s=0.05), SlowToCancel())
+        request = asyncio.create_task(asgi_post(app, BODY))
+        await asyncio.wait_for(cancelling.wait(), 2)  # timed out; backend has not stopped yet
+        assert not request.done()
+        assert (await asgi_post(app, BODY))[0]["status"] == 503
+        finish.set()
+        assert (await asyncio.wait_for(request, 2))[0]["status"] == 504
+
+    asyncio.run(scenario())
+
+
+def test_validation_message_is_bounded(client):
+    response = client.post("/v1/completions", json=payload(**{"k" * 100_000: 1}))
+    assert_error(response, 422)
+    assert len(response.content) < 1000
+    response = client.post("/v1/completions", json=payload(**{f"f{i}": 1 for i in range(50)}))
+    assert_error(response, 422)
+    assert len(response.content) < 1000
+    assert "and 45 more errors" in response.json()["error"]["message"]
+
+
+def test_deeply_nested_json_is_rejected(client):
+    response = client.post("/v1/completions", content="[" * 100_000 + "]" * 100_000,
+                           headers={"Content-Type": "application/json"})
+    assert_error(response, 400)
+
+
+def test_request_id_is_logged_with_failures(caplog):
+    class Broken(EchoBackend):
+        async def generate(self, *args):
+            raise RuntimeError("boom")
+
+        def is_ready(self):
+            raise RuntimeError("boom")
+
+    with TestClient(create_app(Settings(), Broken())) as client:
+        client.post("/v1/completions", json=payload(), headers={"X-Request-ID": "trace-gen"})
+        client.get("/readyz", headers={"X-Request-ID": "trace-ready"})
+    assert "request_id=trace-gen" in caplog.text
+    assert "request_id=trace-ready" in caplog.text
