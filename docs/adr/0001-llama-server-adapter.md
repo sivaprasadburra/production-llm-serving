@@ -116,6 +116,32 @@ number of physical cores, and a modest `-c` (context); check the real per-slot
 context in `/props`. Speed depends heavily on the CPU: measure it with
 `benchmarks/bench.py` instead of trusting published numbers.
 
+## Remaining production risks (reviewed 2026-11-16)
+
+1. **No authentication or per-client rate limiting** on the service. Fine on
+   localhost; anything wider needs a reverse proxy or an auth layer first.
+2. **Slow request bodies are not bounded in time.** The deadline covers
+   generation, not upload; uvicorn has no body-read timeout. Size is capped, so
+   the cost is a held connection, but put a proxy with read timeouts in front,
+   or set uvicorn's `--limit-concurrency`.
+3. **The concurrency limit is per process.** Run one uvicorn worker, or divide
+   `--parallel` between workers; N workers admit N x `LLM_MAX_CONCURRENCY`.
+4. **Memory pressure is untested.** On 16 GB a model that is too large makes
+   Windows page instead of failing, which looks like a very slow, healthy
+   server. Deadlines catch it per request; nothing detects it globally.
+5. **No metrics or structured logs.** Failures carry a request ID in plain-text
+   logs only; there is no latency, queue or token telemetry.
+6. **Readiness probes are not cached** and can take up to two probe timeouts
+   (connect, then read) against a frozen llama-server.
+7. **Character-based prompt limit.** `LLM_MAX_PROMPT_CHARS` is a coarse guard;
+   the real limit is the token context, enforced by llama-server's 400.
+8. **Defaults are tuned for the echo backend.** A 30 s deadline and 512-token
+   cap are too tight for many CPU models; set them per deployment.
+9. **Dependencies are unpinned** (lower bounds only) and llama-server's HTTP API
+   is not versioned by us: pin both before depending on this.
+10. **Windows llama-server not exercised** by tests or CI (mocked tests do run
+    on Windows).
+
 ## Implementation plan
 
 1. Done: backend protocol (`async is_ready`, `aclose`, `BackendError`), adapter,
