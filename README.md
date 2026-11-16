@@ -184,6 +184,22 @@ without restarting the service. With this backend, additional failures apply:
 
 Do not expose llama-server itself to the network: it has none of this service's limits.
 
+### Validate and measure on your own machine
+
+`scripts/validate_llama.py` does steps 1–5 automatically with a pinned
+llama.cpp build and a pinned model, then benchmarks llama-server directly and
+through the gateway and records load time and memory:
+
+```powershell
+.venv\Scripts\python scripts\validate_llama.py --download --label "my Windows laptop"
+```
+
+See [docs/windows-validation.md](docs/windows-validation.md) for the recommended
+model, what gets downloaded, and how to read and share the report.
+
+In a container or CPU-limited VM, always pass `-t` to llama-server: it sizes its
+thread pool from the host's cores, not from the CPU quota.
+
 ## Failure behavior
 
 | Situation | Response |

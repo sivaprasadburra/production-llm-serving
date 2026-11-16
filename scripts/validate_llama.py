@@ -433,10 +433,11 @@ def run(args, server, model, model_info, out):
                     "--requests", str(args.requests), "--concurrency", str(args.parallel),
                     "--warmup", str(args.warmup), "--max-tokens", str(args.max_tokens),
                     "--temperature", "0", "--timeout", str(args.timeout),
-                    "--prompt-file", str(prompt_file), "--label", f"{args.label} | {target}",
-                    "--output", str(out / f"{name}.json"), *(["--unique-prompts"] if unique else [])]
+                    # Relative names (cwd is the report folder): no local paths in the results.
+                    "--prompt-file", prompt_file.name, "--label", f"{args.label} | {target}",
+                    "--output", f"{name}.json", *(["--unique-prompts"] if unique else [])]
                 say(f"  {target}, {'a different prompt each request' if unique else 'same prompt each request'}")
-                finished = subprocess.run(bench_command, capture_output=True, text=True)
+                finished = subprocess.run(bench_command, capture_output=True, text=True, cwd=out)
                 output_file = out / f"{name}.json"
                 data = json.loads(output_file.read_text(encoding="utf-8")) if output_file.exists() else None
                 bench.append({"name": name, "target": target, "unique_prompts": unique,

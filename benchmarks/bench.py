@@ -12,6 +12,7 @@ import platform
 import statistics
 import subprocess
 import time
+import uuid
 
 import httpx
 
@@ -30,11 +31,13 @@ def percentile(sorted_values, q):
 
 async def run_benchmark(client: httpx.AsyncClient, *, model, requests, concurrency,
                         warmup, prompt, max_tokens, temperature,
-                        unique_prompts: bool = False, first_number: int = 0) -> list[dict]:
+                        unique_prompts: bool = False, first_number: int = 0,
+                        run_id: str = "") -> list[dict]:
     payload = dict(model=model, prompt=prompt, max_tokens=max_tokens, temperature=temperature)
 
     async def send(number):
-        request_payload = {**payload, "prompt": f"[request {number}] {prompt}"} if unique_prompts else payload
+        request_payload = ({**payload, "prompt": f"[request {run_id}{number}] {prompt}"}
+                           if unique_prompts else payload)
         started = time.perf_counter()
         try:
             response = await client.post("v1/completions", json=request_payload)
@@ -246,7 +249,10 @@ def main(argv=None) -> int:
         ) as client:
             common = dict(model=args.model, concurrency=args.concurrency, prompt=prompt,
                           max_tokens=args.max_tokens, temperature=args.temperature,
-                          unique_prompts=args.unique_prompts)
+                          unique_prompts=args.unique_prompts,
+                          # Unique across runs too: llama-server keeps earlier prompts in a RAM
+                          # cache, so repeating a previous run's prompts would not be cold.
+                          run_id=uuid.uuid4().hex[:8] + "-")
             await run_benchmark(client, requests=0, warmup=args.warmup, **common)
             started = time.perf_counter()
             records = await run_benchmark(client, requests=args.requests, warmup=0,

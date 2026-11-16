@@ -245,7 +245,16 @@ def test_unique_prompts(monkeypatch, unique_prompts, through_main):
         asyncio.run(scenario())
     assert len(received) == 8
     assert all(prompt.endswith(OPTIONS["prompt"]) for prompt in received)
-    if unique_prompts:
+    if unique_prompts and through_main:
+        # main() adds a per-run id so a second run never repeats the first run's prompts.
+        prefixes = {prompt[: -len(OPTIONS["prompt"])] for prompt in received}
+        run_ids = {prefix.split("-")[0] for prefix in prefixes}
+        assert len(prefixes) == 8 and len(run_ids) == 1
+        first_run = set(received)
+        received.clear()
+        assert bench.main(args + ["--unique-prompts"]) == 0
+        assert not first_run & set(received)
+    elif unique_prompts:
         assert set(received) == {f"[request {n}] {OPTIONS['prompt']}" for n in range(8)}
     else:
         assert received == [OPTIONS["prompt"]] * 8
