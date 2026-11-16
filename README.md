@@ -123,3 +123,31 @@ CI runs the suite on Ubuntu and Windows with Python 3.11 and 3.12.
 
 Tests use in-process clients and fake backends, with no network calls or weights.
 Concurrency, disconnect and cancellation tests coordinate with events rather than sleeps. The suite should finish in under 10 seconds.
+
+## Benchmark
+
+With the service running, use its configured model ID (`echo-1` by default):
+
+Linux:
+
+```sh
+.venv/bin/python benchmarks/bench.py --model echo-1 --requests 20 --concurrency 2 --label "echo" --output benchmark.json
+```
+
+Windows (PowerShell):
+
+```powershell
+.venv\Scripts\python benchmarks/bench.py --model echo-1 --requests 20 --concurrency 2 --label "echo" --output benchmark.json
+```
+
+Use `--url` for another service, `--prompt` or `--prompt-file` (UTF-8) for input,
+`--max-tokens` and `--temperature` for generation, and `--timeout` for the per-request
+HTTP timeout. `--warmup` sequential requests run first (default 1, 0 disables them);
+they are excluded from counts and measured wall time. Workers send the next request
+as soon as the previous one finishes. Failures are counted without retries.
+
+A short summary always prints; `--output` optionally saves JSON with configuration
+(prompt length only), environment, successful-request latency percentiles, aggregate
+token throughput and mean per-request token speed. RAM is reported in GiB rounded
+to one decimal. With no successes, latency and mean per-request token speed are
+null and the exit code is 1; otherwise it is 0.
