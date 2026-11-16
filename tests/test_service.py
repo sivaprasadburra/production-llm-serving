@@ -39,7 +39,7 @@ def test_health_ready_models(client):
 
 def test_not_ready():
     class NotReady(EchoBackend):
-        def is_ready(self):
+        async def is_ready(self):
             return False
 
     with TestClient(create_app(Settings(), NotReady())) as client:
@@ -173,7 +173,7 @@ def test_failures_release_slot(failure, status, caplog):
 
 def test_readiness_exception_is_generic():
     class Broken(EchoBackend):
-        def is_ready(self):
+        async def is_ready(self):
             raise RuntimeError("secret")
 
     with TestClient(create_app(Settings(), Broken())) as client:
@@ -197,8 +197,7 @@ def test_echo(prompt, maximum, stop, text, reason, prompt_count, completion_coun
     assert (result.text, result.finish_reason, result.prompt_tokens, result.completion_tokens) == (
         text, reason, prompt_count, completion_count
     )
-    assert backend.is_ready()
-    assert backend.model_id == "echo-1"
+    assert asyncio.run(backend.is_ready())
 
 
 @pytest.fixture
@@ -244,7 +243,7 @@ def test_fractional_timeout_config(clean_env, monkeypatch):
 
 
 def test_unknown_backend(clean_env, monkeypatch):
-    assert isinstance(get_backend("echo"), EchoBackend)
+    assert isinstance(get_backend(Settings()), EchoBackend)
     monkeypatch.setenv("LLM_BACKEND", "unknown")
     with pytest.raises(ValueError, match="Unknown LLM_BACKEND"):
         create_app()
@@ -392,7 +391,7 @@ def test_request_id_is_logged_with_failures(caplog):
         async def generate(self, *args):
             raise RuntimeError("boom")
 
-        def is_ready(self):
+        async def is_ready(self):
             raise RuntimeError("boom")
 
     with TestClient(create_app(Settings(), Broken())) as client:

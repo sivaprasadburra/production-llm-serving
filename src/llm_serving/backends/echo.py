@@ -2,10 +2,11 @@ from . import GenerationResult
 
 
 class EchoBackend:
-    model_id = "echo-1"
-
-    def is_ready(self) -> bool:
+    async def is_ready(self) -> bool:
         return True
+
+    async def aclose(self) -> None:
+        pass
 
     async def generate(
         self, prompt: str, max_tokens: int, temperature: float, stop: list[str] | None
