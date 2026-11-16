@@ -27,6 +27,7 @@ Dev extra (`[dev]`): `pytest`, `httpx`. Nothing else.
 |---|---|---|
 | `LLM_BACKEND` | `echo` | backend name; unknown name -> startup error |
 | `LLM_MODEL_ID` | `echo-1` | model id reported by `/v1/models` |
+| `LLM_MAX_REQUEST_BYTES` | `1048576` | larger HTTP body -> 413 before parsing (Content-Length or streamed) |
 | `LLM_MAX_PROMPT_CHARS` | `8192` | longer prompt -> 413 |
 | `LLM_MAX_TOKENS_LIMIT` | `512` | upper bound for `max_tokens` |
 | `LLM_MAX_CONCURRENCY` | `4` | in-flight generations; extra requests get 503 immediately |
@@ -53,12 +54,12 @@ Deterministic; ignores temperature.
 ## HTTP API
 
 - `GET /healthz` -> 200 `{"status":"ok"}` (process liveness).
-- `GET /readyz` -> 200 `{"status":"ready"}` or 503 `{"status":"not_ready"}` from `backend.is_ready()`.
+- `GET /readyz` -> 200 `{"status":"ready"}` or 503 `{"status":"not_ready"}` from `backend.is_ready()` (the one exception to the error envelope rule below).
 - `GET /v1/models` -> `{"object":"list","data":[{"id":..., "object":"model", "owned_by":"local"}]}`.
 - `POST /v1/completions`, request:
   - `model: str` (required; must equal the configured model id, else 404)
   - `prompt: str` (required, non-empty after strip)
-  - `max_tokens: int = 16` (1..LLM_MAX_TOKENS_LIMIT, else 422)
+  - `max_tokens: int = 16` (strict int, 1..LLM_MAX_TOKENS_LIMIT, else 422)
   - `temperature: float = 1.0` (0..2)
   - `stop: str | list[str] | None` (max 4 non-empty items)
   - `stream: bool = false`; `true` -> 400 "streaming not supported yet"
