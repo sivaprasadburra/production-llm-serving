@@ -24,10 +24,14 @@ Configuration comes from environment variables at app creation:
 | --- | --- |
 | `LLM_BACKEND` | `echo` |
 | `LLM_MODEL_ID` | `echo-1` |
+| `LLM_MAX_REQUEST_BYTES` | `1048576` |
 | `LLM_MAX_PROMPT_CHARS` | `8192` |
 | `LLM_MAX_TOKENS_LIMIT` | `512` |
 | `LLM_MAX_CONCURRENCY` | `4` |
 | `LLM_REQUEST_TIMEOUT_S` | `30` |
+
+HTTP request bodies exceeding `LLM_MAX_REQUEST_BYTES` return 413 before parsing.
+The limit applies to both declared Content-Length and streamed body bytes.
 
 Numeric settings must be positive integers, including the timeout in seconds.
 Unknown backends fail at startup. The configured model ID is authoritative for

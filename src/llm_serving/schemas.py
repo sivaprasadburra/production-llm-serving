@@ -8,7 +8,7 @@ class CompletionRequest(BaseModel):
 
     model: str
     prompt: str
-    max_tokens: int = Field(default=16, ge=1)
+    max_tokens: int = Field(default=16, ge=1, strict=True)
     temperature: float = Field(default=1.0, ge=0, le=2)
     stop: str | list[str] | None = None
     stream: bool = False

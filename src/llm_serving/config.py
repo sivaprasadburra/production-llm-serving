@@ -6,6 +6,7 @@ from dataclasses import dataclass, fields
 class Settings:
     backend: str = "echo"
     model_id: str = "echo-1"
+    max_request_bytes: int = 1048576
     max_prompt_chars: int = 8192
     max_tokens_limit: int = 512
     max_concurrency: int = 4

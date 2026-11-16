@@ -209,7 +209,7 @@ def clean_env(monkeypatch):
 
 def test_config_defaults_and_valid_env(clean_env, monkeypatch):
     assert Settings.from_env() == Settings()
-    values = dict(backend="echo", model_id="custom", max_prompt_chars=123,
+    values = dict(backend="echo", model_id="custom", max_request_bytes=1024, max_prompt_chars=123,
                   max_tokens_limit=12, max_concurrency=2, request_timeout_s=3)
     for name, value in values.items():
         monkeypatch.setenv(f"LLM_{name.upper()}", str(value))
@@ -218,7 +218,7 @@ def test_config_defaults_and_valid_env(clean_env, monkeypatch):
         assert client.get("/v1/models").json()["data"][0]["id"] == "custom"
 
 
-@pytest.mark.parametrize("name", ["MAX_PROMPT_CHARS", "MAX_TOKENS_LIMIT", "MAX_CONCURRENCY", "REQUEST_TIMEOUT_S"])
+@pytest.mark.parametrize("name", ["MAX_REQUEST_BYTES", "MAX_PROMPT_CHARS", "MAX_TOKENS_LIMIT", "MAX_CONCURRENCY", "REQUEST_TIMEOUT_S"])
 @pytest.mark.parametrize("value", ["abc", "1.5", "0", "-1", ""])
 def test_invalid_config(clean_env, monkeypatch, name, value):
     monkeypatch.setenv(f"LLM_{name}", value)
