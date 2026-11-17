@@ -13,6 +13,7 @@ Windows, Linux and macOS. Needs: pip install -e ".[dev,llama]"
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -591,6 +592,16 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if min(args.parallel, args.requests, args.max_tokens, args.load_runs, args.ctx) < 1 or args.warmup < 0:
         parser.error("counts must be positive")
+    if args.threads is not None and args.threads < 1:
+        parser.error("threads must be positive")
+    for name in ("timeout", "load_timeout"):
+        value = getattr(args, name)
+        if not math.isfinite(value) or value <= 0:
+            parser.error(f"{name.replace('_', '-')} must be finite and positive")
+    if not all(1 <= port <= 65535 for port in (args.llama_port, args.gateway_port)):
+        parser.error("ports must be between 1 and 65535")
+    if args.llama_port == args.gateway_port:
+        parser.error("llama-port and gateway-port must differ")
     for stream in (sys.stdout, sys.stderr):  # Windows consoles are often cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")

@@ -6,8 +6,9 @@ gateway in front of it, checks that text is generated through both, benchmarks
 llama-server directly and through the gateway, and measures model load time and
 memory. It then writes a report containing only what it measured.
 
-Results from other machines (the cloud sandbox, GitHub's Windows runner) are in
-[benchmarks/RESULTS.md](../benchmarks/RESULTS.md). They are not a substitute
+Earlier cloud sandbox results are in
+[benchmarks/RESULTS.md](../benchmarks/RESULTS.md). GitHub Windows runner reports
+are attached as `validation-report-<preset>` artifacts on the workflow runs. They are not a substitute
 for running this on your own laptop: CPU speed differs a lot between machines.
 
 ## Recommended model
@@ -119,3 +120,17 @@ Or paste `report.md` into the pull request.
   pull requests, and with a real model when the pull request has the
   `real-model` label or the workflow is started manually. Those reports say
   "GitHub Actions hosted runner" at the top.
+
+Ports must be distinct and between 1 and 65535. Explicit thread counts must be
+positive; request and load timeouts must be finite positive seconds. Invalid
+options fail before downloads or server startup.
+
+A disconnect check whose detail says `inconclusive` only confirms that another
+request succeeded. It does not prove cancellation: fast models can finish before
+the client disconnects. With `--parallel` greater than one, a successful request
+may use another slot. Use the default single slot for cancellation validation.
+
+Custom `--model` files receive raw text prompts, without the Qwen preset chat
+template. Successful generation does not establish answer quality or correct
+chat formatting for an arbitrary model. Review reports before sharing: labels,
+model filenames, and generated text are included.

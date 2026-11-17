@@ -165,18 +165,23 @@ def test_presets_are_pinned():
     assert ("Windows", "AMD64") in validate.LLAMA_ASSETS
 
 
-def test_end_to_end_with_a_fake_llama_server(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("relative_output", [False, True])
+def test_end_to_end_with_a_fake_llama_server(tmp_path, monkeypatch, capsys, relative_output):
     """Full run: real processes, real HTTP, real benchmark harness; only the model is fake."""
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     model = tmp_path / "private folder" / "fake model.gguf"
     model.parent.mkdir()
     model.write_bytes(b"GGUF not really")
     out = tmp_path / "report"
+    if relative_output:
+        monkeypatch.chdir(tmp_path)
+        import shutil
+        shutil.copy(FAKE_SERVER, tmp_path / "fake_llama_server.py")
     code = validate.main([
-        "--model", str(model), "--llama-server", str(FAKE_SERVER), "--load-runs", "2",
+        "--model", str(model), "--llama-server", "fake_llama_server.py" if relative_output else str(FAKE_SERVER), "--load-runs", "2",
         "--requests", "3", "--warmup", "1", "--max-tokens", "8", "--threads", "2",
         "--llama-port", str(free_port()), "--gateway-port", str(free_port()),
-        "--label", "unit test", "--out", str(out),
+        "--label", "unit test", "--out", "report" if relative_output else str(out),
     ])
     printed = capsys.readouterr().out
     assert code == 0, printed
@@ -207,3 +212,22 @@ def test_end_to_end_with_a_fake_llama_server(tmp_path, monkeypatch, capsys):
     for private in (str(tmp_path), "private folder"):  # no local folders or user names leak
         assert private not in text
         assert private not in json.dumps(report)
+
+@pytest.mark.parametrize("option,value", [
+    ("--threads", "-1"), ("--threads", "0"),
+    ("--timeout", "nan"), ("--timeout", "0"),
+    ("--load-timeout", "inf"), ("--load-timeout", "-1"),
+    ("--llama-port", "0"), ("--gateway-port", "65536"),
+])
+def test_invalid_runtime_options_fail_before_loading(option, value, tmp_path, capsys):
+    with pytest.raises(SystemExit) as exc:
+        validate.main([option, value, "--cache", str(tmp_path)])
+    assert exc.value.code == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_ports_must_differ(capsys):
+    with pytest.raises(SystemExit) as exc:
+        validate.main(["--llama-port", "8000", "--gateway-port", "8000"])
+    assert exc.value.code == 2
+    assert "must differ" in capsys.readouterr().err
