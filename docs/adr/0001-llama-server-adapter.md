@@ -142,6 +142,11 @@ context in `/props`. Speed depends heavily on the CPU: measure it with
 10. **Windows llama-server not exercised** by tests or CI (mocked tests do run
     on Windows).
 
+11. **llama-server's default thread count ignores CPU quotas.** In a container
+    limited to 4 CPUs on a 64-core host it started 64 threads and generated at
+    3.5 tokens/s instead of about 2,700 (stories15M, measured 2026-11-16).
+    Always pass `-t`; `scripts/validate_llama.py` does.
+
 ## Implementation plan
 
 1. Done: backend protocol (`async is_ready`, `aclose`, `BackendError`), adapter,

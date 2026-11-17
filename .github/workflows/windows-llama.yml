@@ -1,0 +1,62 @@
+name: Windows llama-server validation
+
+# Runs scripts/validate_llama.py with the real Windows llama-server binary.
+# Pull requests use the 19 MB toy model (plumbing check). Add the "real-model"
+# label to a pull request, or start the workflow manually, to use a real model.
+# Results come from a GitHub-hosted runner and are labelled as such.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - scripts/**
+      - src/**
+      - benchmarks/bench.py
+      - tests/fake_llama_server.py
+      - pyproject.toml
+      - .github/workflows/windows-llama.yml
+  workflow_dispatch:
+    inputs:
+      preset:
+        description: Model preset
+        type: choice
+        options: [stories15m, qwen2.5-0.5b, qwen2.5-1.5b]
+        default: qwen2.5-1.5b
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-llama-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      PRESET: ${{ inputs.preset || (contains(github.event.pull_request.labels.*.name, 'real-model') && 'qwen2.5-1.5b') || 'stories15m' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev,llama]"
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: llama-b12443-${{ env.PRESET }}
+      - name: Validate llama-server and the gateway
+        run: >
+          python scripts/validate_llama.py --preset $env:PRESET --download
+          --label "GitHub Actions windows-latest runner" --out validation-report
+      - name: Publish report
+        if: always()
+        run: if (Test-Path validation-report/report.md) { Get-Content validation-report/report.md -Encoding utf8 | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-report-${{ env.PRESET }}
+          path: validation-report/

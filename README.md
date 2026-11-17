@@ -184,6 +184,22 @@ without restarting the service. With this backend, additional failures apply:
 
 Do not expose llama-server itself to the network: it has none of this service's limits.
 
+### Validate and measure on your own machine
+
+`scripts/validate_llama.py` does steps 1–5 automatically with a pinned
+llama.cpp build and a pinned model, then benchmarks llama-server directly and
+through the gateway and records load time and memory:
+
+```powershell
+.venv\Scripts\python scripts\validate_llama.py --download --label "my Windows laptop"
+```
+
+See [docs/windows-validation.md](docs/windows-validation.md) for the recommended
+model, what gets downloaded, and how to read and share the report.
+
+In a container or CPU-limited VM, always pass `-t` to llama-server: it sizes its
+thread pool from the host's cores, not from the CPU quota.
+
 ## Failure behavior
 
 | Situation | Response |
@@ -233,6 +249,9 @@ Use `--url` for another service, `--prompt` or `--prompt-file` (UTF-8) for input
 HTTP timeout. `--warmup` sequential requests run first (default 1, 0 disables them);
 they are excluded from counts and measured wall time. Workers send the next request
 as soon as the previous one finishes. Failures are counted without retries.
+
+Use `--unique-prompts` to prepend a distinct request number to every prompt,
+including warmup, when measuring prompt processing without llama-server's prompt-prefix cache reuse.
 
 A short summary always prints; `--output` optionally saves JSON with configuration
 (prompt length only), environment, successful-request latency percentiles, aggregate
