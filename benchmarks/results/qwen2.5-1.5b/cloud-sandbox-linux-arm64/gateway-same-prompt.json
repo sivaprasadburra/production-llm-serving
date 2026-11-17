@@ -1,0 +1,47 @@
+{
+  "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+  "timestamp_utc": "2026-11-16T23:31:02.569071+00:00",
+  "config": {
+    "url": "http://127.0.0.1:8000",
+    "model": "qwen2.5-1.5b",
+    "requests": 20,
+    "concurrency": 1,
+    "warmup": 2,
+    "prompt_file": "bench-prompt.txt",
+    "unique_prompts": false,
+    "max_tokens": 64,
+    "temperature": 0.0,
+    "timeout": 300.0,
+    "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+    "output": "gateway-same-prompt.json",
+    "prompt_chars": 169
+  },
+  "environment": {
+    "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "cpu_model": "Neoverse-V2",
+    "cpu_count": 4,
+    "cpu_physical_cores": null,
+    "ram_total_gb": 247.2,
+    "python": "3.11.2"
+  },
+  "wall_time_s": 25.819201513018925,
+  "requests": 20,
+  "ok": 20,
+  "status_counts": {
+    "200": 20
+  },
+  "requests_per_s": 0.7746172936415294,
+  "latency_s": {
+    "mean": 1.2909322706545936,
+    "min": 1.273135790019296,
+    "p50": 1.2812159720051568,
+    "p95": 1.3297711509396322,
+    "p99": 1.3471420597960242,
+    "max": 1.351484787010122
+  },
+  "prompt_tokens_total": 680,
+  "completion_tokens_total": 1280,
+  "completion_tokens_per_s": 49.57550679305788,
+  "completion_tokens_per_s_per_request_mean": 49.58805846079246
+}

@@ -98,6 +98,20 @@ Or paste `report.md` into the pull request.
 | `--llama-port`, `--gateway-port` | Change if 8080 or 8000 are taken. |
 | `--llama-server PATH` | Use your own `llama-server.exe` instead of the pinned build. |
 
+## Things this validation has already shown
+
+Measured while preparing this milestone (details in `benchmarks/RESULTS.md`):
+
+- **Thread count matters enormously in containers and VMs.** Left to its
+  default, llama-server started 64 threads on a 4-CPU quota and ran about 780
+  times slower. The script always passes `-t`.
+- **llama-server's memory grows with the number of distinct prompts** because it
+  caches them in RAM, up to 8 GB by default. For long-running use on a 16 GB
+  laptop start it with `--cache-ram 1024` (or `0`).
+- **On Windows the gateway needs the connect timeout (2 s by default) to notice
+  that llama-server is down**; on Linux it is immediate. Set
+  `LLM_LLAMA_SERVER_CONNECT_TIMEOUT_S=0.5` if you want faster failures.
+
 ## If something goes wrong
 
 | Symptom | Cause and fix |

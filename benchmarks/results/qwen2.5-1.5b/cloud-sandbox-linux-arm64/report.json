@@ -1,0 +1,539 @@
+{
+  "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop)",
+  "memory_limit_gb": 8.0,
+  "ci": false,
+  "timestamp_utc": "2026-11-16T23:30:27+00:00",
+  "passed": true,
+  "environment": {
+    "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "cpu_model": "Neoverse-V2",
+    "cpu_count": 4,
+    "cpu_physical_cores": null,
+    "ram_total_gb": 247.2,
+    "python": "3.11.2"
+  },
+  "model": {
+    "name": "Qwen2.5-1.5B-Instruct Q4_K_M",
+    "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+    "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+    "file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "size": 1117320736,
+    "license": "apache-2.0",
+    "sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+    "source": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+  },
+  "config": {
+    "preset": "qwen2.5-1.5b",
+    "download": false,
+    "threads": 4,
+    "ctx": 4096,
+    "parallel": 1,
+    "requests": 20,
+    "warmup": 2,
+    "max_tokens": 64,
+    "load_runs": 2,
+    "load_timeout": 600,
+    "timeout": 300,
+    "llama_port": 8080,
+    "gateway_port": 8000,
+    "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop)"
+  },
+  "llama_command_display": [
+    "llama-server",
+    "-m",
+    "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8080",
+    "--alias",
+    "qwen2.5-1.5b",
+    "-np",
+    "1",
+    "-c",
+    "4096",
+    "-t",
+    "4"
+  ],
+  "command_display": [
+    "python",
+    "scripts/validate_llama.py",
+    "--preset",
+    "qwen2.5-1.5b",
+    "--llama-server",
+    "llama-server",
+    "--label",
+    "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop)",
+    "--out",
+    "val-qwen2"
+  ],
+  "bench_commands_display": [
+    {
+      "name": "direct-same-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8080",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | llama-server direct",
+        "--output",
+        "direct-same-prompt.json"
+      ]
+    },
+    {
+      "name": "gateway-same-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8000",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+        "--output",
+        "gateway-same-prompt.json"
+      ]
+    },
+    {
+      "name": "direct-unique-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8080",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | llama-server direct",
+        "--output",
+        "direct-unique-prompt.json",
+        "--unique-prompts"
+      ]
+    },
+    {
+      "name": "gateway-unique-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8000",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+        "--output",
+        "gateway-unique-prompt.json",
+        "--unique-prompts"
+      ]
+    }
+  ],
+  "result": {
+    "checks": [
+      {
+        "name": "gateway lists the model",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "llama-server generates text directly",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "gateway generates text through llama-server",
+        "ok": true,
+        "detail": "0.162 s"
+      },
+      {
+        "name": "unknown model is rejected with 404",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "client disconnect frees the slot",
+        "ok": true,
+        "detail": "next request answered 200 after 1.174 s; the abandoned request would have run for about 10 s"
+      },
+      {
+        "name": "benchmark direct-same-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 25.553s; 0.78 requests/s; 50.09 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "benchmark gateway-same-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 25.819s; 0.77 requests/s; 49.58 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "benchmark direct-unique-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 29.860s; 0.67 requests/s; 42.87 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "benchmark gateway-unique-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 29.853s; 0.67 requests/s; 42.88 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "readiness turns 503 when llama-server is down",
+        "ok": true,
+        "detail": "0.002 s"
+      },
+      {
+        "name": "completions return 503 when llama-server is down",
+        "ok": true,
+        "detail": "0.002 s"
+      },
+      {
+        "name": "gateway stays alive without llama-server",
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "launches": [
+      {
+        "launch": 1,
+        "ready_s": 1.193,
+        "log_model_loaded_s": 1.174,
+        "memory_after_load": {
+          "rss_mb": 1992.0,
+          "peak_rss_mb": 2064.0,
+          "private_mb": 1102.7
+        }
+      },
+      {
+        "launch": 2,
+        "ready_s": 1.182,
+        "log_model_loaded_s": 1.165,
+        "memory_after_load": {
+          "rss_mb": 1992.0,
+          "peak_rss_mb": 2064.0,
+          "private_mb": 1102.7
+        }
+      }
+    ],
+    "benchmarks": [
+      {
+        "name": "direct-same-prompt",
+        "target": "llama-server direct",
+        "unique_prompts": false,
+        "exit_code": 0,
+        "result": {
+          "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | llama-server direct",
+          "timestamp_utc": "2026-11-16T23:30:34.166011+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8080",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": false,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | llama-server direct",
+            "output": "direct-same-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+            "machine": "aarch64",
+            "cpu_model": "Neoverse-V2",
+            "cpu_count": 4,
+            "cpu_physical_cores": null,
+            "ram_total_gb": 247.2,
+            "python": "3.11.2"
+          },
+          "wall_time_s": 25.55310333200032,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.782683799308003,
+          "latency_s": {
+            "mean": 1.2776190913573373,
+            "min": 1.2677891610073857,
+            "p50": 1.2755501510109752,
+            "p95": 1.2944505637395196,
+            "p99": 1.3041006599809042,
+            "max": 1.3065131840412505
+          },
+          "prompt_tokens_total": 680,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 50.091763155712194,
+          "completion_tokens_per_s_per_request_mean": 50.095709044969446
+        }
+      },
+      {
+        "name": "gateway-same-prompt",
+        "target": "through gateway",
+        "unique_prompts": false,
+        "exit_code": 0,
+        "result": {
+          "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+          "timestamp_utc": "2026-11-16T23:31:02.569071+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8000",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": false,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+            "output": "gateway-same-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+            "machine": "aarch64",
+            "cpu_model": "Neoverse-V2",
+            "cpu_count": 4,
+            "cpu_physical_cores": null,
+            "ram_total_gb": 247.2,
+            "python": "3.11.2"
+          },
+          "wall_time_s": 25.819201513018925,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.7746172936415294,
+          "latency_s": {
+            "mean": 1.2909322706545936,
+            "min": 1.273135790019296,
+            "p50": 1.2812159720051568,
+            "p95": 1.3297711509396322,
+            "p99": 1.3471420597960242,
+            "max": 1.351484787010122
+          },
+          "prompt_tokens_total": 680,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 49.57550679305788,
+          "completion_tokens_per_s_per_request_mean": 49.58805846079246
+        }
+      },
+      {
+        "name": "direct-unique-prompt",
+        "target": "llama-server direct",
+        "unique_prompts": true,
+        "exit_code": 0,
+        "result": {
+          "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | llama-server direct",
+          "timestamp_utc": "2026-11-16T23:31:31.142250+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8080",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": true,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | llama-server direct",
+            "output": "direct-unique-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+            "machine": "aarch64",
+            "cpu_model": "Neoverse-V2",
+            "cpu_count": 4,
+            "cpu_physical_cores": null,
+            "ram_total_gb": 247.2,
+            "python": "3.11.2"
+          },
+          "wall_time_s": 29.86035252502188,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.6697844569397073,
+          "latency_s": {
+            "mean": 1.4929782386607258,
+            "min": 1.476334217004478,
+            "p50": 1.4879829400160816,
+            "p95": 1.5181359105627052,
+            "p99": 1.5215600693016313,
+            "max": 1.5224161089863628
+          },
+          "prompt_tokens_total": 972,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 42.86620524414127,
+          "completion_tokens_per_s_per_request_mean": 42.870409455432196
+        }
+      },
+      {
+        "name": "gateway-unique-prompt",
+        "target": "through gateway",
+        "unique_prompts": true,
+        "exit_code": 0,
+        "result": {
+          "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+          "timestamp_utc": "2026-11-16T23:32:04.259861+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8000",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": true,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "cloud sandbox VM, 4 vCPU Neoverse-V2, Linux (NOT a Windows laptop) | through gateway",
+            "output": "gateway-unique-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Linux-7.0.0-1017-aws-aarch64-with-glibc2.36",
+            "machine": "aarch64",
+            "cpu_model": "Neoverse-V2",
+            "cpu_count": 4,
+            "cpu_physical_cores": null,
+            "ram_total_gb": 247.2,
+            "python": "3.11.2"
+          },
+          "wall_time_s": 29.853170783957466,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.6699455861736343,
+          "latency_s": {
+            "mean": 1.4926295610435774,
+            "min": 1.4773091759998351,
+            "p50": 1.4888459225185215,
+            "p95": 1.501818958169315,
+            "p99": 1.5585248412028885,
+            "max": 1.572701311961282
+          },
+          "prompt_tokens_total": 972,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 42.876517515112596,
+          "completion_tokens_per_s_per_request_mean": 42.88417825382932
+        }
+      }
+    ],
+    "llama_server_version": [
+      "version: 1.0.0-dev (build 1, commit 301db63)",
+      "built with GNU 12.2.0 for Linux aarch64"
+    ],
+    "n_threads": 4,
+    "n_ctx_slot": 4096,
+    "llama_props": {
+      "build_info": "b1-301db63",
+      "total_slots": 1
+    },
+    "gateway_env": {
+      "LLM_BACKEND": "llama_server",
+      "LLM_MODEL_ID": "qwen2.5-1.5b",
+      "LLM_LLAMA_SERVER_URL": "http://127.0.0.1:8080",
+      "LLM_MAX_CONCURRENCY": "1",
+      "LLM_REQUEST_TIMEOUT_S": "300",
+      "LLM_MAX_TOKENS_LIMIT": "512"
+    },
+    "sample": {
+      "question": "What is the capital of France? Answer in one short sentence.",
+      "text": "The capital of France is Paris.",
+      "seconds": 0.162,
+      "tokens_per_s": 49.4,
+      "usage": {
+        "prompt_tokens": 32,
+        "completion_tokens": 8,
+        "total_tokens": 40
+      },
+      "finish_reason": "stop"
+    },
+    "disconnect": {
+      "slot_free_after_s": 1.174,
+      "abandoned_request_needed_s": 10.4
+    },
+    "llama_memory_after_benchmarks": {
+      "rss_mb": 2136.5,
+      "peak_rss_mb": 2136.5,
+      "private_mb": 1247.0
+    },
+    "gateway_memory_after_benchmarks": {
+      "rss_mb": 52.7,
+      "peak_rss_mb": 52.7,
+      "private_mb": 37.8
+    },
+    "outage": {
+      "readyz_seconds": 0.002,
+      "completion_seconds": 0.002
+    }
+  }
+}

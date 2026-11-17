@@ -1,0 +1,47 @@
+{
+  "label": "GitHub Actions windows-latest runner | through gateway",
+  "timestamp_utc": "2026-11-17T02:31:30.148344+00:00",
+  "config": {
+    "url": "http://127.0.0.1:8000",
+    "model": "qwen2.5-1.5b",
+    "requests": 20,
+    "concurrency": 1,
+    "warmup": 2,
+    "prompt_file": "bench-prompt.txt",
+    "unique_prompts": true,
+    "max_tokens": 64,
+    "temperature": 0.0,
+    "timeout": 300.0,
+    "label": "GitHub Actions windows-latest runner | through gateway",
+    "output": "gateway-unique-prompt.json",
+    "prompt_chars": 169
+  },
+  "environment": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "machine": "AMD64",
+    "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_count": 4,
+    "cpu_physical_cores": 2,
+    "ram_total_gb": 16.0,
+    "python": "3.12.10"
+  },
+  "wall_time_s": 40.36309290000003,
+  "requests": 20,
+  "ok": 20,
+  "status_counts": {
+    "200": 20
+  },
+  "requests_per_s": 0.4955021670304157,
+  "latency_s": {
+    "mean": 2.0181269299999967,
+    "min": 1.9022845000000075,
+    "p50": 2.011015850000007,
+    "p95": 2.1054336899999724,
+    "p99": 2.1114025779999883,
+    "max": 2.1128947999999923
+  },
+  "prompt_tokens_total": 972,
+  "completion_tokens_total": 1280,
+  "completion_tokens_per_s": 31.712138689946606,
+  "completion_tokens_per_s_per_request_mean": 31.736738705487735
+}

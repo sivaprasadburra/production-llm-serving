@@ -271,6 +271,30 @@ def test_real_socket_timeout_closes_upstream_connection():
         thread.join(5)
 
 
+def test_closed_local_port_fails_within_the_connect_timeout():
+    """Nothing listens on the port: the gateway must answer 503 quickly on every OS.
+
+    Linux refuses loopback connections at once. Windows retries them, so the
+    failure only arrives when our connect timeout fires (measured on a
+    GitHub-hosted Windows runner: 2.0 s with the default 2 s timeout). The
+    connect timeout is therefore the upper bound for noticing an outage.
+    """
+    import socket
+    import time
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]  # free now, and closed once the socket is gone
+    settings = Settings(**SETTINGS, llama_server_url=f"http://127.0.0.1:{port}",
+                        llama_server_connect_timeout_s=0.3)
+    with TestClient(create_app(settings)) as client:
+        started = time.perf_counter()
+        assert_error(client.post("/v1/completions", json=payload(model="tiny")), 503)
+        assert client.get("/readyz").status_code == 503
+        assert time.perf_counter() - started < 2.0  # two attempts, each bounded by 0.3 s
+        assert client.get("/healthz").status_code == 200
+
+
 def test_client_is_closed_on_shutdown_and_ignores_proxy_env(monkeypatch):
     monkeypatch.setenv("HTTP_PROXY", "http://proxy.invalid:3128")
     monkeypatch.setenv("ALL_PROXY", "http://proxy.invalid:3128")

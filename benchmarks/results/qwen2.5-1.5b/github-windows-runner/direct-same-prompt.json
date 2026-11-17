@@ -1,0 +1,47 @@
+{
+  "label": "GitHub Actions windows-latest runner | llama-server direct",
+  "timestamp_utc": "2026-11-17T02:29:19.168290+00:00",
+  "config": {
+    "url": "http://127.0.0.1:8080",
+    "model": "qwen2.5-1.5b",
+    "requests": 20,
+    "concurrency": 1,
+    "warmup": 2,
+    "prompt_file": "bench-prompt.txt",
+    "unique_prompts": false,
+    "max_tokens": 64,
+    "temperature": 0.0,
+    "timeout": 300.0,
+    "label": "GitHub Actions windows-latest runner | llama-server direct",
+    "output": "direct-same-prompt.json",
+    "prompt_chars": 169
+  },
+  "environment": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "machine": "AMD64",
+    "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_count": 4,
+    "cpu_physical_cores": 2,
+    "ram_total_gb": 16.0,
+    "python": "3.12.10"
+  },
+  "wall_time_s": 36.71262820000001,
+  "requests": 20,
+  "ok": 20,
+  "status_counts": {
+    "200": 20
+  },
+  "requests_per_s": 0.5447716761394923,
+  "latency_s": {
+    "mean": 1.8355893949999982,
+    "min": 1.744819700000022,
+    "p50": 1.823256750000013,
+    "p95": 1.9295062299999912,
+    "p99": 1.952937486000014,
+    "max": 1.9587953000000198
+  },
+  "prompt_tokens_total": 680,
+  "completion_tokens_total": 1280,
+  "completion_tokens_per_s": 34.86538727292751,
+  "completion_tokens_per_s_per_request_mean": 34.896450869699045
+}

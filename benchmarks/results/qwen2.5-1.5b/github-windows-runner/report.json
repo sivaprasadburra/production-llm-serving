@@ -1,0 +1,538 @@
+{
+  "label": "GitHub Actions windows-latest runner",
+  "memory_limit_gb": null,
+  "ci": true,
+  "timestamp_utc": "2026-11-17T02:29:08+00:00",
+  "passed": true,
+  "environment": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "machine": "AMD64",
+    "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_count": 4,
+    "cpu_physical_cores": 2,
+    "ram_total_gb": 16.0,
+    "python": "3.12.10"
+  },
+  "model": {
+    "name": "Qwen2.5-1.5B-Instruct Q4_K_M",
+    "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+    "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+    "file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "size": 1117320736,
+    "license": "apache-2.0",
+    "sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+    "source": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+  },
+  "config": {
+    "preset": "qwen2.5-1.5b",
+    "download": true,
+    "threads": 2,
+    "ctx": 4096,
+    "parallel": 1,
+    "requests": 20,
+    "warmup": 2,
+    "max_tokens": 64,
+    "load_runs": 2,
+    "load_timeout": 600,
+    "timeout": 300,
+    "llama_port": 8080,
+    "gateway_port": 8000,
+    "label": "GitHub Actions windows-latest runner"
+  },
+  "llama_command_display": [
+    "llama-server.exe",
+    "-m",
+    "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8080",
+    "--alias",
+    "qwen2.5-1.5b",
+    "-np",
+    "1",
+    "-c",
+    "4096",
+    "-t",
+    "2"
+  ],
+  "command_display": [
+    "python",
+    "scripts/validate_llama.py",
+    "--preset",
+    "qwen2.5-1.5b",
+    "--download",
+    "--label",
+    "GitHub Actions windows-latest runner",
+    "--out",
+    "validation-report"
+  ],
+  "bench_commands_display": [
+    {
+      "name": "direct-same-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8080",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "GitHub Actions windows-latest runner | llama-server direct",
+        "--output",
+        "direct-same-prompt.json"
+      ]
+    },
+    {
+      "name": "gateway-same-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8000",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "GitHub Actions windows-latest runner | through gateway",
+        "--output",
+        "gateway-same-prompt.json"
+      ]
+    },
+    {
+      "name": "direct-unique-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8080",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "GitHub Actions windows-latest runner | llama-server direct",
+        "--output",
+        "direct-unique-prompt.json",
+        "--unique-prompts"
+      ]
+    },
+    {
+      "name": "gateway-unique-prompt",
+      "display": [
+        "python",
+        "benchmarks/bench.py",
+        "--url",
+        "http://127.0.0.1:8000",
+        "--model",
+        "qwen2.5-1.5b",
+        "--requests",
+        "20",
+        "--concurrency",
+        "1",
+        "--warmup",
+        "2",
+        "--max-tokens",
+        "64",
+        "--temperature",
+        "0",
+        "--timeout",
+        "300",
+        "--prompt-file",
+        "bench-prompt.txt",
+        "--label",
+        "GitHub Actions windows-latest runner | through gateway",
+        "--output",
+        "gateway-unique-prompt.json",
+        "--unique-prompts"
+      ]
+    }
+  ],
+  "result": {
+    "checks": [
+      {
+        "name": "gateway lists the model",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "llama-server generates text directly",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "gateway generates text through llama-server",
+        "ok": true,
+        "detail": "0.233 s"
+      },
+      {
+        "name": "unknown model is rejected with 404",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "client disconnect frees the slot",
+        "ok": true,
+        "detail": "next request answered 200 after 0.27 s; the abandoned request would have run for about 15 s"
+      },
+      {
+        "name": "benchmark direct-same-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 36.713s; 0.54 requests/s; 34.87 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "benchmark gateway-same-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 36.764s; 0.54 requests/s; 34.82 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "benchmark direct-unique-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 41.137s; 0.49 requests/s; 31.12 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "benchmark gateway-unique-prompt",
+        "ok": true,
+        "detail": "20/20 succeeded in 40.363s; 0.50 requests/s; 31.71 completion tokens/s; statuses: {'200': 20}"
+      },
+      {
+        "name": "readiness turns 503 when llama-server is down",
+        "ok": true,
+        "detail": "2.001 s"
+      },
+      {
+        "name": "completions return 503 when llama-server is down",
+        "ok": true,
+        "detail": "2.002 s"
+      },
+      {
+        "name": "gateway stays alive without llama-server",
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "launches": [
+      {
+        "launch": 1,
+        "ready_s": 0.977,
+        "log_model_loaded_s": 0.946,
+        "memory_after_load": {
+          "rss_mb": 1711.0,
+          "peak_rss_mb": 1711.0,
+          "private_mb": 897.3
+        }
+      },
+      {
+        "launch": 2,
+        "ready_s": 0.952,
+        "log_model_loaded_s": 0.931,
+        "memory_after_load": {
+          "rss_mb": 1710.7,
+          "peak_rss_mb": 1710.7,
+          "private_mb": 897.5
+        }
+      }
+    ],
+    "benchmarks": [
+      {
+        "name": "direct-same-prompt",
+        "target": "llama-server direct",
+        "unique_prompts": false,
+        "exit_code": 0,
+        "result": {
+          "label": "GitHub Actions windows-latest runner | llama-server direct",
+          "timestamp_utc": "2026-11-17T02:29:19.168290+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8080",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": false,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "GitHub Actions windows-latest runner | llama-server direct",
+            "output": "direct-same-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Windows-2025Server-10.0.26100-SP0",
+            "machine": "AMD64",
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "cpu_count": 4,
+            "cpu_physical_cores": 2,
+            "ram_total_gb": 16.0,
+            "python": "3.12.10"
+          },
+          "wall_time_s": 36.71262820000001,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.5447716761394923,
+          "latency_s": {
+            "mean": 1.8355893949999982,
+            "min": 1.744819700000022,
+            "p50": 1.823256750000013,
+            "p95": 1.9295062299999912,
+            "p99": 1.952937486000014,
+            "max": 1.9587953000000198
+          },
+          "prompt_tokens_total": 680,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 34.86538727292751,
+          "completion_tokens_per_s_per_request_mean": 34.896450869699045
+        }
+      },
+      {
+        "name": "gateway-same-prompt",
+        "target": "through gateway",
+        "unique_prompts": false,
+        "exit_code": 0,
+        "result": {
+          "label": "GitHub Actions windows-latest runner | through gateway",
+          "timestamp_utc": "2026-11-17T02:30:01.283869+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8000",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": false,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "GitHub Actions windows-latest runner | through gateway",
+            "output": "gateway-same-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Windows-2025Server-10.0.26100-SP0",
+            "machine": "AMD64",
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "cpu_count": 4,
+            "cpu_physical_cores": 2,
+            "ram_total_gb": 16.0,
+            "python": "3.12.10"
+          },
+          "wall_time_s": 36.76418469999999,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.5440077119403659,
+          "latency_s": {
+            "mean": 1.8381823550000007,
+            "min": 1.7464067999999884,
+            "p50": 1.8200641499999932,
+            "p95": 1.9523715199999843,
+            "p99": 1.9876966240000111,
+            "max": 1.996527900000018
+          },
+          "prompt_tokens_total": 680,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 34.81649356418342,
+          "completion_tokens_per_s_per_request_mean": 34.86806903858132
+        }
+      },
+      {
+        "name": "direct-unique-prompt",
+        "target": "llama-server direct",
+        "unique_prompts": true,
+        "exit_code": 0,
+        "result": {
+          "label": "GitHub Actions windows-latest runner | llama-server direct",
+          "timestamp_utc": "2026-11-17T02:30:43.321795+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8080",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": true,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "GitHub Actions windows-latest runner | llama-server direct",
+            "output": "direct-unique-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Windows-2025Server-10.0.26100-SP0",
+            "machine": "AMD64",
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "cpu_count": 4,
+            "cpu_physical_cores": 2,
+            "ram_total_gb": 16.0,
+            "python": "3.12.10"
+          },
+          "wall_time_s": 41.136614699999996,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.48618487801817106,
+          "latency_s": {
+            "mean": 2.0567795350000098,
+            "min": 1.9759842999999933,
+            "p50": 2.0477021000000377,
+            "p95": 2.1413810150000248,
+            "p99": 2.2365834030000404,
+            "max": 2.2603840000000446
+          },
+          "prompt_tokens_total": 992,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 31.115832193162948,
+          "completion_tokens_per_s_per_request_mean": 31.14470153667461
+        }
+      },
+      {
+        "name": "gateway-unique-prompt",
+        "target": "through gateway",
+        "unique_prompts": true,
+        "exit_code": 0,
+        "result": {
+          "label": "GitHub Actions windows-latest runner | through gateway",
+          "timestamp_utc": "2026-11-17T02:31:30.148344+00:00",
+          "config": {
+            "url": "http://127.0.0.1:8000",
+            "model": "qwen2.5-1.5b",
+            "requests": 20,
+            "concurrency": 1,
+            "warmup": 2,
+            "prompt_file": "bench-prompt.txt",
+            "unique_prompts": true,
+            "max_tokens": 64,
+            "temperature": 0.0,
+            "timeout": 300.0,
+            "label": "GitHub Actions windows-latest runner | through gateway",
+            "output": "gateway-unique-prompt.json",
+            "prompt_chars": 169
+          },
+          "environment": {
+            "platform": "Windows-2025Server-10.0.26100-SP0",
+            "machine": "AMD64",
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "cpu_count": 4,
+            "cpu_physical_cores": 2,
+            "ram_total_gb": 16.0,
+            "python": "3.12.10"
+          },
+          "wall_time_s": 40.36309290000003,
+          "requests": 20,
+          "ok": 20,
+          "status_counts": {
+            "200": 20
+          },
+          "requests_per_s": 0.4955021670304157,
+          "latency_s": {
+            "mean": 2.0181269299999967,
+            "min": 1.9022845000000075,
+            "p50": 2.011015850000007,
+            "p95": 2.1054336899999724,
+            "p99": 2.1114025779999883,
+            "max": 2.1128947999999923
+          },
+          "prompt_tokens_total": 972,
+          "completion_tokens_total": 1280,
+          "completion_tokens_per_s": 31.712138689946606,
+          "completion_tokens_per_s_per_request_mean": 31.736738705487735
+        }
+      }
+    ],
+    "llama_server_version": [
+      "version: 1.0.0-dev (build 12443, commit 301db6337)",
+      "built with Clang 20.1.8 for Windows x86_64"
+    ],
+    "n_threads": 2,
+    "n_ctx_slot": 4096,
+    "llama_props": {
+      "build_info": "b12443-301db6337",
+      "total_slots": 1
+    },
+    "gateway_env": {
+      "LLM_BACKEND": "llama_server",
+      "LLM_MODEL_ID": "qwen2.5-1.5b",
+      "LLM_LLAMA_SERVER_URL": "http://127.0.0.1:8080",
+      "LLM_MAX_CONCURRENCY": "1",
+      "LLM_REQUEST_TIMEOUT_S": "300",
+      "LLM_MAX_TOKENS_LIMIT": "512"
+    },
+    "sample": {
+      "question": "What is the capital of France? Answer in one short sentence.",
+      "text": "The capital of France is Paris.",
+      "seconds": 0.233,
+      "tokens_per_s": 34.3,
+      "usage": {
+        "prompt_tokens": 32,
+        "completion_tokens": 8,
+        "total_tokens": 40
+      },
+      "finish_reason": "stop"
+    },
+    "disconnect": {
+      "slot_free_after_s": 0.27,
+      "abandoned_request_needed_s": 14.9
+    },
+    "llama_memory_after_benchmarks": {
+      "rss_mb": 1209.4,
+      "peak_rss_mb": 1760.9,
+      "private_mb": 1035.7
+    },
+    "gateway_memory_after_benchmarks": {
+      "rss_mb": 29.9,
+      "peak_rss_mb": 53.8,
+      "private_mb": 42.0
+    },
+    "outage": {
+      "readyz_seconds": 2.001,
+      "completion_seconds": 2.002
+    }
+  }
+}
