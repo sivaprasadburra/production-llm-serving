@@ -6,9 +6,9 @@ gateway in front of it, checks that text is generated through both, benchmarks
 llama-server directly and through the gateway, and measures model load time and
 memory. It then writes a report containing only what it measured.
 
-Earlier cloud sandbox results are in
-[benchmarks/RESULTS.md](../benchmarks/RESULTS.md). GitHub Windows runner reports
-are attached as `validation-report-<preset>` artifacts on the workflow runs. They are not a substitute
+Cloud sandbox results and one GitHub Windows runner run are in
+[benchmarks/RESULTS.md](../benchmarks/RESULTS.md). Every GitHub Windows runner report
+is also attached as a `validation-report-<preset>` artifact on its workflow run. They are not a substitute
 for running this on your own laptop: CPU speed differs a lot between machines.
 
 ## Recommended model
@@ -97,6 +97,20 @@ Or paste `report.md` into the pull request.
 | `--load-runs N` | How many times llama-server is launched to time loading (default 2: first launch, then with a warm file cache). |
 | `--llama-port`, `--gateway-port` | Change if 8080 or 8000 are taken. |
 | `--llama-server PATH` | Use your own `llama-server.exe` instead of the pinned build. |
+
+## Things this validation has already shown
+
+Measured while preparing this milestone (details in `benchmarks/RESULTS.md`):
+
+- **Thread count matters enormously in containers and VMs.** Left to its
+  default, llama-server started 64 threads on a 4-CPU quota and ran about 780
+  times slower. The script always passes `-t`.
+- **llama-server's memory grows with the number of distinct prompts** because it
+  caches them in RAM, up to 8 GB by default. For long-running use on a 16 GB
+  laptop start it with `--cache-ram 1024` (or `0`).
+- **On Windows the gateway needs the connect timeout (2 s by default) to notice
+  that llama-server is down**; on Linux it is immediate. Set
+  `LLM_LLAMA_SERVER_CONNECT_TIMEOUT_S=0.5` if you want faster failures.
 
 ## If something goes wrong
 

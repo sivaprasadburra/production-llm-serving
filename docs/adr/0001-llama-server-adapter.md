@@ -147,6 +147,17 @@ context in `/props`. Speed depends heavily on the CPU: measure it with
     3.5 tokens/s instead of about 2,700 (stories15M, measured 2026-11-16).
     Always pass `-t`; `scripts/validate_llama.py` does.
 
+12. **llama-server's prompt cache grows in RAM** (`--cache-ram`, default 8192
+    MiB). With Qwen2.5-1.5B its private memory rose from 1,177 MB after 22
+    distinct prompts to 1,247 MB after 44 (about 3 MB per ~110-token prompt,
+    measured 2026-11-16). On a 16 GB machine cap it, for example
+    `--cache-ram 1024`, or disable it with `--cache-ram 0`.
+13. **Outages are noticed more slowly on Windows.** Linux refuses a connection
+    to a stopped llama-server at once; Windows retries, so `/readyz` and
+    completions only fail when `LLM_LLAMA_SERVER_CONNECT_TIMEOUT_S` expires
+    (2.0 s measured on a GitHub Windows runner with the default). Lower it, for
+    example to `0.5`, when llama-server runs on the same machine.
+
 ## Implementation plan
 
 1. Done: backend protocol (`async is_ready`, `aclose`, `BackendError`), adapter,

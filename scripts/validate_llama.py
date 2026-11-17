@@ -511,7 +511,8 @@ def render(report):
         "## Checks", "", "| Check | Result | Detail |", "|---|---|---|",
         *[f"| {c['name']} | {'pass' if c['ok'] else '**FAIL**'} | {c['detail']} |" for c in result["checks"]], "",
         "## Model load time", "",
-        "Ready = process start until `/health` returns 200. Loaded = llama-server's own log timestamp.",
+        "Ready = process start until `/health` returns 200 (polled; up to 0.25 s coarse on Windows). "
+        "Loaded = llama-server's own log timestamp.",
         "The first launch may read the model from disk; later launches use the OS file cache.", "",
         "| Launch | Ready (s) | Loaded per log (s) | Memory after load (MB) |", "|---|---|---|---|",
         *[f"| {l['launch']} | {l['ready_s']} | {l['log_model_loaded_s']} | {(l['memory_after_load'] or {}).get('rss_mb')} |"
@@ -555,7 +556,9 @@ def render(report):
     if result.get("outage"):
         lines += ["## Outage behaviour", "",
                   f"With llama-server stopped, `/readyz` answered in {result['outage']['readyz_seconds']} s and a "
-                  f"completion request in {result['outage']['completion_seconds']} s.", ""]
+                  f"completion request in {result['outage']['completion_seconds']} s. Linux refuses the "
+                  "connection at once; Windows only fails when `LLM_LLAMA_SERVER_CONNECT_TIMEOUT_S` "
+                  "(default 2 s) expires.", ""]
     if result.get("sample"):
         sample = result["sample"]
         lines += ["## Sample generation through the gateway", "", f"Question: {sample['question']}", "",
