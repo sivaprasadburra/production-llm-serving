@@ -6,9 +6,9 @@ gateway in front of it, checks that text is generated through both, benchmarks
 llama-server directly and through the gateway, and measures model load time and
 memory. It then writes a report containing only what it measured.
 
-Earlier cloud sandbox results are in
-[benchmarks/RESULTS.md](../benchmarks/RESULTS.md). GitHub Windows runner reports
-are attached as `validation-report-<preset>` artifacts on the workflow runs. They are not a substitute
+Cloud sandbox results and one GitHub Windows runner run are in
+[benchmarks/RESULTS.md](../benchmarks/RESULTS.md). Every GitHub Windows runner report
+is also attached as a `validation-report-<preset>` artifact on its workflow run. They are not a substitute
 for running this on your own laptop: CPU speed differs a lot between machines.
 
 ## Recommended model
